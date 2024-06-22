@@ -15,17 +15,18 @@ namespace TestConsole
     }
     class Program
     {
-        private static TwitchLib.Api.TwitchAPI api { get; set; } = new TwitchLib.Api.TwitchAPI();
+        private static TwitchLib.Api.TwitchAPI Api { get; set; } = new TwitchLib.Api.TwitchAPI();
         private static HueController hueController;
-        private static JsonFileController jsonController = new("tokens.json");
+        private static readonly JsonFileController jsonController = new("tokens.json");
 
-        private static TwitchOAuthConfig config = new TwitchOAuthConfig
+        private static readonly TwitchOAuthConfig config = new()
         {
             ChannelId = "",
             ClientId = "",
             ClientSecret = "",
             RedirectUri = ""
-        }; static async Task Main(string[] args)
+        };
+         static async Task Main(string[] args)
         {
             hueController = new HueController(jsonController);
             await StartMenu();
@@ -58,7 +59,7 @@ namespace TestConsole
 
         private static async Task RenderStartMenu()
         {
-            bool twitchConfigured = await ValidateTwitchConfiguration(api);
+            bool twitchConfigured = await ValidateTwitchConfiguration(Api);
             bool hueConfigured = await ValidateHueConfiguration();
             Console.WriteLine("Welcome To Yuki's Disco Lights");
             Console.WriteLine("Select an option:");
@@ -113,29 +114,22 @@ namespace TestConsole
 
         private static async Task StartApp()
         {
-            try
-            {
-                hueController.StartPollingForLinkButton("MyApp", "MyDevice");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error Found it : {ex.Message}");
-            } finally 
-            {
-                JsonNode AccessTokenJson = await jsonController.GetValueByKeyAsync("AccessToken");
-                string AccessToken = AccessTokenJson.GetValue<string>();
-                
-                TwitchEventSubListener eventSubListener = new TwitchEventSubListener(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
-                await eventSubListener.ConnectAsync();
-                await eventSubListener.ListenForEventsAsync();
-            }
+                bool result = await hueController.StartPollingForLinkButton("MyApp", "MyDevice");
+                if (result == true) 
+                {
+                    JsonNode AccessTokenJson = await jsonController.GetValueByKeyAsync("AccessToken");
+                    string AccessToken = AccessTokenJson.GetValue<string>();
+                    
+                    TwitchEventSubListener eventSubListener = new(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
+                    await eventSubListener.ConnectAsync();
+                    await eventSubListener.ListenForEventsAsync();
+                }
         }
         public static async Task ConnectToTwitchEvents()
         {
             List<String> scopes = ["channel:bot", "user:read:chat", "channel:read:redemptions"];
 
-
-            api.Settings.ClientId = config.ClientId;
+            Api.Settings.ClientId = config.ClientId;
 
             WebServer server = new(config.RedirectUri);
 
@@ -145,10 +139,10 @@ namespace TestConsole
             var auth = await server.Listen();
 
             // exchange auth code for oauth access/refresh
-            var resp = await api.Auth.GetAccessTokenFromCodeAsync(auth.Code, config.ClientSecret, config.RedirectUri);
+            var resp = await Api.Auth.GetAccessTokenFromCodeAsync(auth.Code, config.ClientSecret, config.RedirectUri);
 
             // update TwitchLib's api with the recently acquired access token
-            api.Settings.AccessToken = resp.AccessToken;
+            Api.Settings.AccessToken = resp.AccessToken;
 
 
             await jsonController.UpdateAsync(jsonNode =>
@@ -162,7 +156,7 @@ namespace TestConsole
             });
 
             // get the auth'd user 
-            var user = (await api.Helix.Users.GetUsersAsync()).Users[0];
+            var user = (await Api.Helix.Users.GetUsersAsync()).Users[0];
 
             // print out all the data we've got
             Console.WriteLine($"Authorization success!\n\nUser: {user.DisplayName} (id: {user.Id})\nAccess token: {resp.AccessToken}\nRefresh token: {resp.RefreshToken}\nExpires in: {resp.ExpiresIn}\nScopes: {string.Join(", ", resp.Scopes)}");

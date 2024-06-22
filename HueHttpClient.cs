@@ -4,10 +4,13 @@ using System.Text.Json.Nodes;
 using HueApi;
 using HueApi.Models;
 using HueApi.Models.Requests;
-
-public class HueController
+using HueApi.ColorConverters;
+using HueApi.ColorConverters.Original;
+using HueApi.ColorConverters.HSB;
+public class HueController : IDisposable
 {
-    private LocalHueApi _hueClient;
+    private TaskCompletionSource<bool> _pollingTaskCompletionSource;
+    public LocalHueApi _hueClient;
     private HttpClient _httpClient;
     private JsonFileController _JsonController;
     private string _appKey;
@@ -118,27 +121,30 @@ public class HueController
         return false;
     }
 
-    public void StartPollingForLinkButton(string appName, string deviceName)
+public async Task<bool> StartPollingForLinkButton(string appName, string deviceName)
+{
+    _pollingTaskCompletionSource = new TaskCompletionSource<bool>();
+    _isPolling = true;
+
+    _pollingTimer = new Timer(async _ =>
     {
-        _isPolling = true;
-        _pollingTimer = new Timer(async _ =>
+        bool registered = await TryRegisterApplicationAsync(appName, deviceName);
+        if (registered)
         {
-            bool registered = await TryRegisterApplicationAsync(appName, deviceName);
-            if (registered)
-            {
-                _pollingTimer?.Change(Timeout.Infinite, 0);
-                _isPolling = false;
+            _pollingTimer?.Change(Timeout.Infinite, 0);
+            _isPolling = false;
+            _pollingTaskCompletionSource.SetResult(true);
+            _hueClient = new LocalHueApi(_bridgeIp, _appKey);
+            Console.WriteLine("Successfully registered with the Hue Bridge.");
+        }
+        else
+        {
+            Console.WriteLine("Waiting for the link button to be pressed...");
+        }
+    }, null, 0, PollingInterval);
 
-                Console.WriteLine("Successfully registered with the Hue Bridge.");
-            }
-            else
-            {
-                Console.WriteLine("Waiting for the link button to be pressed...");
-            }
-        }, null, 0, PollingInterval);
-        _hueClient = new LocalHueApi(_bridgeIp, _appKey);
-
-    }
+    return await _pollingTaskCompletionSource.Task;
+}
 
     public async Task<HueResponse<Light>> GetLightsAsync()
     {
@@ -153,22 +159,24 @@ public class HueController
 
     public async Task TurnOffLightAsync(Guid lightId)
     {
-        Console.WriteLine("TURN OFF ");
         var command = new UpdateLight().TurnOff();
         await _hueClient.UpdateLightAsync(lightId, command);
-        Console.WriteLine("TURNED OFF ");
-
     }
 
     public async Task SetLightColorAsync(Guid lightId, double x, double y)
     {
-        var command = new UpdateLight().SetColor(x, y);
-        await _hueClient.UpdateLightAsync(lightId, command);
+        var req = new UpdateLight().TurnOn().SetColor(x,y);
+        var result = await _hueClient.UpdateLightAsync(lightId, req);
     }
 
     public async Task SetLightBrightnessAsync(Guid lightId, byte brightness)
     {
         var command = new UpdateLight().SetBrightness(brightness);
         await _hueClient.UpdateLightAsync(lightId, command);
+    }
+
+    public void Dispose()
+    {
+        throw new NotImplementedException();
     }
 }
