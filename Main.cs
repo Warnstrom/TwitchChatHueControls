@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Nodes;
+using DotNetEnv;
 
 namespace TestConsole
 {
@@ -16,18 +17,20 @@ namespace TestConsole
     class Program
     {
         private static TwitchLib.Api.TwitchAPI Api { get; set; } = new TwitchLib.Api.TwitchAPI();
-        private static HueController hueController;
+        private static HueController? hueController;
         private static readonly JsonFileController jsonController = new("tokens.json");
 
-        private static readonly TwitchOAuthConfig config = new()
-        {
-            ChannelId = "",
-            ClientId = "",
-            ClientSecret = "",
-            RedirectUri = ""
-        };
+        private static TwitchOAuthConfig? config;
         static async Task Main(string[] args)
         {
+            Env.Load();
+            config = new()
+            {
+                ChannelId = Env.GetString("CHANNEL_ID"),
+                ClientId = Env.GetString("CLIENT_ID"),
+                ClientSecret = Env.GetString("CLIENT_SECRET"),
+                RedirectUri = Env.GetString("REDIRECT_URI")
+            };
             hueController = new HueController(jsonController);
             await StartMenu();
         }

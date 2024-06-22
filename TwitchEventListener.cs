@@ -3,7 +3,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using HueApi.Models;
-public class TwitchEventSubListener : IDisposable
+public class TwitchEventSubListener
 {
     private readonly string _clientId;
     private readonly string _channelId;
@@ -205,13 +205,12 @@ public class TwitchEventSubListener : IDisposable
 
             if (command == "color")
             {
-                string hexColor = CommandAndAction[1];
-                await _hueController.SetLightColorAsync(light.Id, hexColor);
+                string color = CommandAndAction[1].ToLower();
+                await _hueController.SetLightColorAsync(light.Id, color);
             }
             else if (command == "power")
             {
                 string action = CommandAndAction[1];
-                Console.WriteLine(action);
                 if (action == "on")
                 {
                     await _hueController.TurnOnLightAsync(light.Id);   
@@ -221,19 +220,11 @@ public class TwitchEventSubListener : IDisposable
                     await _hueController.TurnOffLightAsync(light.Id);   
                 }
             }
-            else {
-                Console.WriteLine("Wrong format");
-            }
         }
     }
-
     private Task HandleKeepAliveAsync(JObject payload)
     {
         return Task.CompletedTask;
     }
 
-    public void Dispose()
-    {
-        throw new NotImplementedException();
-    }
 }
