@@ -26,7 +26,7 @@ namespace TestConsole
             ClientSecret = "",
             RedirectUri = ""
         };
-         static async Task Main(string[] args)
+        static async Task Main(string[] args)
         {
             hueController = new HueController(jsonController);
             await StartMenu();
@@ -114,16 +114,16 @@ namespace TestConsole
 
         private static async Task StartApp()
         {
-                var test = await hueController.StartPollingForLinkButton("MyApp", "MyDevice");
-                if (test == true) 
-                {
-                    JsonNode AccessTokenJson = await jsonController.GetValueByKeyAsync("AccessToken");
-                    string AccessToken = AccessTokenJson.GetValue<string>();
-                    
-                    TwitchEventSubListener eventSubListener = new(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
-                    await eventSubListener.ConnectAsync();
-                    await eventSubListener.ListenForEventsAsync();
-                }
+            bool result = await hueController.StartPollingForLinkButton("MyApp", "MyDevice");
+            if (result == true)
+            {
+                JsonNode AccessTokenJson = await jsonController.GetValueByKeyAsync("AccessToken");
+                string AccessToken = AccessTokenJson.GetValue<string>();
+
+                TwitchEventSubListener eventSubListener = new(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
+                await eventSubListener.ConnectAsync();
+                await eventSubListener.ListenForEventsAsync();
+            }
         }
         public static async Task ConnectToTwitchEvents()
         {

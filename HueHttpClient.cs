@@ -8,7 +8,7 @@ using HueApi.ColorConverters;
 using HueApi.ColorConverters.Original.Extensions;
 public class HueController : IDisposable
 {
-          Dictionary<string, string> colorHexCodes = new Dictionary<string, string>()
+    Dictionary<string, string> colorHexCodes = new Dictionary<string, string>()
         {
             { "AliceBlue", "F0F8FF" },
             { "AntiqueWhite", "FAEBD7" },
@@ -167,11 +167,13 @@ public class HueController : IDisposable
         _httpClient = new HttpClient();
         _JsonController = JsonController;
     }
-    public void SetBridgeIp(string BridgeIp) {
+    public void SetBridgeIp(string BridgeIp)
+    {
         _bridgeIp = BridgeIp;
     }
 
-    public bool ValidateBridgeIp() {
+    public bool ValidateBridgeIp()
+    {
         return true;
     }
     public async Task DiscoverBridgeAsync()
@@ -264,31 +266,31 @@ public class HueController : IDisposable
         return false;
     }
 
-public async Task<bool> StartPollingForLinkButton(string appName, string deviceName)
-{
-    _pollingTaskCompletionSource = new TaskCompletionSource<bool>();
-    _isPolling = true;
 
-    _pollingTimer = new Timer(async _ =>
+    public async Task<bool> StartPollingForLinkButton(string appName, string deviceName)
     {
-        bool registered = await TryRegisterApplicationAsync(appName, deviceName);
-        if (registered)
-        {
-            _pollingTimer?.Change(Timeout.Infinite, 0);
-            _isPolling = false;
-            _pollingTaskCompletionSource.SetResult(true);
-            _hueClient = new LocalHueApi(_bridgeIp, _appKey);
-            Console.WriteLine("Successfully registered with the Hue Bridge.");
-        }
-        else
-        {
-            Console.WriteLine("Waiting for the link button to be pressed...");
-        }
-    }, null, 0, PollingInterval);
+        _pollingTaskCompletionSource = new TaskCompletionSource<bool>();
+        _isPolling = true;
 
-    return await _pollingTaskCompletionSource.Task;
-}
+        _pollingTimer = new Timer(async _ =>
+        {
+            bool registered = await TryRegisterApplicationAsync(appName, deviceName);
+            if (registered)
+            {
+                _pollingTimer?.Change(Timeout.Infinite, 0);
+                _isPolling = false;
+                _pollingTaskCompletionSource.SetResult(true);
+                _hueClient = new LocalHueApi(_bridgeIp, _appKey);
+                Console.WriteLine("Successfully registered with the Hue Bridge.");
+            }
+            else
+            {
+                Console.WriteLine("Waiting for the link button to be pressed...");
+            }
+        }, null, 0, PollingInterval);
 
+        return await _pollingTaskCompletionSource.Task;
+    }
     public async Task<HueResponse<Light>> GetLightsAsync()
     {
         return await _hueClient.GetLightsAsync();
@@ -306,24 +308,24 @@ public async Task<bool> StartPollingForLinkButton(string appName, string deviceN
         await _hueClient.UpdateLightAsync(lightId, command);
     }
 
-public async Task SetLightColorAsync(Guid lightId, string color)
-{
-    UpdateLight req;
-    string hexColor;
-
-    // Check if the color name exists in the dictionary and get the hex code
-    if (colorHexCodes.TryGetValue(color, out hexColor))
+    public async Task SetLightColorAsync(Guid lightId, string color)
     {
-        req = new UpdateLight().TurnOn().SetColor(new RGBColor(hexColor));
-    }
-    else
-    {
-        // Assume color is a hex code if not found in the dictionary
-        req = new UpdateLight().TurnOn().SetColor(new RGBColor(color));
-    }
+        UpdateLight req;
+        string hexColor;
 
-    var result = await _hueClient.UpdateLightAsync(lightId, req);
-}
+        // Check if the color name exists in the dictionary and get the hex code
+        if (colorHexCodes.TryGetValue(color, out hexColor))
+        {
+            req = new UpdateLight().TurnOn().SetColor(new RGBColor(hexColor));
+        }
+        else
+        {
+            // Assume color is a hex code if not found in the dictionary
+            req = new UpdateLight().TurnOn().SetColor(new RGBColor(color));
+        }
+
+        var result = await _hueClient.UpdateLightAsync(lightId, req);
+    }
 
     public async Task SetLightBrightnessAsync(Guid lightId, byte brightness)
     {
