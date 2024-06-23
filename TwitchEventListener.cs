@@ -50,7 +50,7 @@ public class TwitchEventSubListener
         };
 
         string subscribeMessageJson = JsonConvert.SerializeObject(subscribeMessage);
-        await SendMessageAsync(subscribeMessageJson);
+        await SendMessageAsync(subscribeMessageJson, "channel.channel_points_custom_reward_redemption.add");
     }
 
     public async Task SubscribeToChannelChatMessagesAsync(string sessionId)
@@ -72,17 +72,17 @@ public class TwitchEventSubListener
         };
 
         string subscribeMessageJson = JsonConvert.SerializeObject(subscribeMessage);
-        await SendMessageAsync(subscribeMessageJson);
+        await SendMessageAsync(subscribeMessageJson, "channel.chat.message");
     }
 
-    private async Task SendMessageAsync(string message)
+    private async Task SendMessageAsync(string message, string type = "")
     {
         try
         {
             HttpResponseMessage response = await _twitchHttpClient.PostAsync(message);
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine("Twitch Event Subscription created successfully.");
+                Console.WriteLine($"Twitch Event {type} Subscription created successfully.");
             }
             else
             {
@@ -183,45 +183,101 @@ public class TwitchEventSubListener
         await SubscribeToChannelChatMessagesAsync(sessionId);
     }
 
-    private async Task HandleNotificationAsync(JObject payload)
+   private async Task HandleNotificationAsync(JObject payload)
+{
+    try
     {
         var lights = await _hueController.GetLightsAsync();
         var light = lights.Data.Last();
+
         // Handle notification event here
-        string type = payload["payload"]["subscription"]["type"].ToString();
+        string eventType = payload["payload"]["subscription"]["type"].ToString();
 
-        if (type == "channel.channel_points_custom_reward_redemption.add")
+        switch (eventType)
         {
-            string rewardPrompt = payload["payload"]["event"]["reward"]["prompt"].ToString();
-            string rewardTitle = payload["payload"]["event"]["reward"]["title"].ToString();
-            Console.WriteLine(rewardTitle);
-            Console.WriteLine(rewardPrompt);
-        }
-        else if (type == "channel.chat.message")
-        {
-            string[] CommandAndAction = payload["payload"]["event"]["message"]["text"].ToString().Split(" ");
-
-            string command = CommandAndAction[0];
-
-            if (command == "color")
-            {
-                string color = CommandAndAction[1].ToLower();
-                await _hueController.SetLightColorAsync(light.Id, color);
-            }
-            else if (command == "power")
-            {
-                string action = CommandAndAction[1];
-                if (action == "on")
-                {
-                    await _hueController.TurnOnLightAsync(light.Id);   
-                }
-                else if (action == "off")
-                {
-                    await _hueController.TurnOffLightAsync(light.Id);   
-                }
-            }
+            case "channel.channel_points_custom_reward_redemption.add":
+                await HandleCustomRewardRedemptionAsync(payload);
+                break;
+            case "channel.chat.message":
+                await HandleChatMessageAsync(payload, light);
+                break;
+            default:
+                Console.WriteLine("Unhandled event type: " + eventType);
+                break;
         }
     }
+    catch (Exception ex)
+    {
+        // Log the exception (you can replace this with your preferred logging mechanism)
+        Console.WriteLine("Error handling notification: " + ex.Message);
+    }
+}
+
+private async Task HandleCustomRewardRedemptionAsync(JObject payload)
+{
+    string rewardPrompt = payload["payload"]["event"]["reward"]["prompt"].ToString();
+    string rewardTitle = payload["payload"]["event"]["reward"]["title"].ToString();
+    Console.WriteLine(rewardTitle);
+    Console.WriteLine(rewardPrompt);
+}
+
+private async Task HandleChatMessageAsync(JObject payload, Light light)
+{
+    string messageText = payload["payload"]["event"]["message"]["text"].ToString();
+    string[] commandAndAction = messageText.Split(" ");
+
+    string command = commandAndAction[0].ToLower();
+
+    switch (command)
+    {
+        case "color":
+            await HandleColorCommandAsync(commandAndAction, light);
+            break;
+        case "power":
+            await HandlePowerCommandAsync(commandAndAction, light);
+            break;
+        default:
+            Console.WriteLine("Unknown command: " + command);
+            break;
+    }
+}
+
+private async Task HandleColorCommandAsync(string[] commandAndAction, Light light)
+{
+    if (commandAndAction.Length < 2)
+    {
+        Console.WriteLine("Invalid color command");
+        return;
+    }
+
+    string color = commandAndAction[1].ToLower();
+    await _hueController.SetLightColorAsync(light.Id, color);
+}
+
+private async Task HandlePowerCommandAsync(string[] commandAndAction, Light light)
+{
+    if (commandAndAction.Length < 2)
+    {
+        Console.WriteLine("Invalid power command");
+        return;
+    }
+
+    string action = commandAndAction[1].ToLower();
+
+    switch (action)
+    {
+        case "on":
+            await _hueController.TurnOnLightAsync(light.Id);
+            break;
+        case "off":
+            await _hueController.TurnOffLightAsync(light.Id);
+            break;
+        default:
+            Console.WriteLine("Unknown power action: " + action);
+            break;
+    }
+}
+
     private Task HandleKeepAliveAsync(JObject payload)
     {
         return Task.CompletedTask;

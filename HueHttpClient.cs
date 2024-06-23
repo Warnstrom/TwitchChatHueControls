@@ -56,9 +56,9 @@ public class HueController : IDisposable
             { "tan", "D2B48C" },
             { "teal", "008080" },
             { "thistle", "D8BFD8" },
-            { "tomato", "FF6347" },
-            { "turquoise", "40E0D0" },
-            { "violet", "EE82EE" },
+            { "tomato", "FF6347" }, 
+            { "turquoise", "40E0D0" }, // Wrong
+            { "violet", "EE82EE" }, // Correct
             { "white", "FFFFFF" },
             { "yellow", "FFFF00" },
         };
@@ -87,51 +87,71 @@ public class HueController : IDisposable
         return true;
     }
     public async Task DiscoverBridgeAsync()
-    {
-        var bridgeIpJson = await _JsonController.GetValueByKeyAsync("bridgeIp");
-        var localBridgeIp = bridgeIpJson.GetValue<string>();
+{
+    var localBridgeIp = await LoadBridgeIpFromConfigAsync();
 
-        if (!string.IsNullOrEmpty(localBridgeIp))
+    if (!string.IsNullOrEmpty(localBridgeIp))
+    {
+        _bridgeIp = localBridgeIp;
+        Console.WriteLine($"Loaded bridge IP from config file: {localBridgeIp}");
+    }
+    else
+    {
+        await DiscoverAndSaveBridgeIpAsync();
+    }
+}
+
+private async Task<string> LoadBridgeIpFromConfigAsync()
+{
+    var bridgeIpJson = await _JsonController.GetValueByKeyAsync("bridgeIp");
+    return bridgeIpJson.GetValue<string>();
+}
+
+private async Task DiscoverAndSaveBridgeIpAsync()
+{
+    Console.WriteLine("Couldn't find bridge IP from config file");
+    Console.WriteLine("Fetching new Bridge IP from discovery.meethue.com/");
+
+    var response = await _httpClient.GetAsync("https://discovery.meethue.com/");
+    response.EnsureSuccessStatusCode();
+
+    var bridges = await response.Content.ReadAsStringAsync();
+    var responseJson = JsonDocument.Parse(bridges);
+
+    if (responseJson.RootElement.ValueKind == JsonValueKind.Array && responseJson.RootElement.GetArrayLength() > 0)
+    {
+        var bridgeInfo = responseJson.RootElement[0];
+
+        if (bridgeInfo.TryGetProperty("internalipaddress", out JsonElement internalIpAddress))
         {
-            _bridgeIp = localBridgeIp;
-            Console.WriteLine($"Loaded bridge IP from config file: {localBridgeIp}");
+            _bridgeIp = internalIpAddress.GetString();
+            Console.WriteLine($"Discovered bridge IP: {_bridgeIp}");
+
+            await SaveBridgeIpToConfigAsync(_bridgeIp);
+            Console.WriteLine("Saved bridge IP to config file.");
         }
         else
         {
-            Console.WriteLine("Couldn't find bridge IP from config file");
-            Console.WriteLine("Fetching new Bridge IP from discovery.meethue.com/");
-
-            var response = await _httpClient.GetAsync("https://discovery.meethue.com/");
-            response.EnsureSuccessStatusCode();
-
-            var bridges = await response.Content.ReadAsStringAsync();
-            var responseJson = JsonDocument.Parse(bridges);
-
-            if (responseJson.RootElement.ValueKind == JsonValueKind.Array && responseJson.RootElement.GetArrayLength() > 0)
-            {
-                var bridgeInfo = responseJson.RootElement[0];
-
-                if (bridgeInfo.TryGetProperty("internalipaddress", out JsonElement internalipaddress))
-                {
-                    _bridgeIp = internalipaddress.GetString();
-                    Console.WriteLine($"Discovered bridge IP: {_bridgeIp}");
-
-                    await _JsonController.UpdateAsync(jsonNode =>
-                    {
-                        if (jsonNode is JsonObject jsonObject)
-                        {
-                            jsonObject["bridgeIp"] = _bridgeIp;
-                        }
-                    });
-                    Console.WriteLine("Saved bridge IP to config file.");
-                }
-                else
-                {
-                    throw new Exception("internalipaddress not found in the response.");
-                }
-            }
+            throw new Exception("internalipaddress not found in the response.");
         }
     }
+    else
+    {
+        throw new Exception("No bridges found in the response.");
+    }
+}
+
+private async Task SaveBridgeIpToConfigAsync(string bridgeIp)
+{
+    await _JsonController.UpdateAsync(jsonNode =>
+    {
+        if (jsonNode is JsonObject jsonObject)
+        {
+            jsonObject["bridgeIp"] = bridgeIp;
+        }
+    });
+}
+
 
     public async Task<bool> TryRegisterApplicationAsync(string appName, string deviceName)
     {
@@ -164,7 +184,7 @@ public class HueController : IDisposable
                     jsonObject["AppKey"] = _appKey;
                 }
             });
-            Console.WriteLine($"App Key: {_appKey}");
+            //Console.WriteLine($"App Key: {_appKey}");
             return true;
         }
         else if (result.TryGetProperty("error", out JsonElement error))
@@ -218,6 +238,11 @@ public class HueController : IDisposable
         await _hueClient.UpdateLightAsync(lightId, command);
     }
 
+    public async Task UpdateLightBrightnessLevelAsync(Guid lightId, double brightness)
+    {
+        var command = new UpdateLight().TurnOn().SetBrightness(brightness);
+        await _hueClient.UpdateLightAsync(lightId, command);
+    }
     public async Task SetLightColorAsync(Guid lightId, string color)
     {
         UpdateLight req;
@@ -234,6 +259,27 @@ public class HueController : IDisposable
         }
 
         await _hueClient.UpdateLightAsync(lightId, req);
+    }
+
+    public async Task SetLightColorAsync(List<Guid> LightIds, string color)
+    {
+        foreach (var LightId in LightIds)
+        {
+        UpdateLight req;
+
+        // Check if the color name exists in the dictionary and get the hex code
+        if (colorHexCodes.TryGetValue(color, out string hexColor))
+        {
+            req = new UpdateLight().TurnOn().SetColor(new RGBColor(hexColor));
+        }
+        else
+        {
+            // Assume color is a hex code if not found in the dictionary
+            req = new UpdateLight().TurnOn().SetColor(new RGBColor(color));
+        }
+
+        await _hueClient.UpdateLightAsync(LightId, req);
+        }
     }
 
     public async Task SetLightBrightnessAsync(Guid lightId, byte brightness)

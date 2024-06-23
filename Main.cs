@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Nodes;
 using DotNetEnv;
 
-namespace TestConsole
+namespace TwitchChatHueControls
 {
     public class TwitchOAuthConfig
     {
@@ -85,7 +85,7 @@ namespace TestConsole
 
             if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync(accessToken) != null)
             {
-                Console.WriteLine($"AccessToken is Valid: {accessToken}");
+                //Console.WriteLine($"AccessToken is Valid: {accessToken}");
                 return true;
             }
 
@@ -162,7 +162,7 @@ namespace TestConsole
             var user = (await Api.Helix.Users.GetUsersAsync()).Users[0];
 
             // print out all the data we've got
-            Console.WriteLine($"Authorization success!\n\nUser: {user.DisplayName} (id: {user.Id})\nAccess token: {resp.AccessToken}\nRefresh token: {resp.RefreshToken}\nExpires in: {resp.ExpiresIn}\nScopes: {string.Join(", ", resp.Scopes)}");
+            Console.WriteLine($"Authorization success!\n\nUser: {user.DisplayName} (id: {user.Id})\nAccess token: {resp.AccessToken}\nRefresh token: {resp.RefreshToken}\nExpires in: {resp.ExpiresIn}\nScopes: {string.Join(", ", resp.Scopes)}\n");
         }
 
         private static string getAuthorizationCodeUrl(string clientId, string redirectUri, List<string> scopes)
