@@ -15,7 +15,6 @@ public class JsonFileController
         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = true, // Format the JSON to be more readable
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
     }
 
@@ -24,7 +23,17 @@ public class JsonFileController
     {
         if (!File.Exists(_filePath))
         {
-            return null;
+            // Create the file with default JSON content
+            var defaultJson = new
+            {
+                bridgeIp = "",
+                AccessToken = "",
+                RefreshToken = "",
+                AppKey = ""
+            };
+
+            string jsonString = JsonSerializer.Serialize(defaultJson, _jsonOptions);
+            await File.WriteAllTextAsync(_filePath, jsonString);
         }
 
         using (FileStream fs = File.OpenRead(_filePath))
