@@ -70,15 +70,15 @@ namespace TwitchChatHueControls
 
         private static async Task<bool> ValidateHueConfiguration()
         {
-            var jsonData = await jsonController.GetValueByKeyAsync("bridgeIp");
+            JsonNode? jsonData = await jsonController.GetValueByKeyAsync("bridgeIp");
             hueController.SetBridgeIp(jsonData.GetValue<string>());
             return !string.IsNullOrEmpty(jsonData.GetValue<string>());
         }
 
         private static async Task<bool> ValidateTwitchConfiguration(TwitchLib.Api.TwitchAPI api)
         {
-            var jsonData = await jsonController.GetValueByKeyAsync("AccessToken");
-            var accessToken = jsonData.GetValue<string>();
+            JsonNode? jsonData = await jsonController.GetValueByKeyAsync("AccessToken");
+            string accessToken = jsonData.GetValue<string>();
             if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync("accessToken") != null)
             {
                 //Console.WriteLine($"AccessToken is Valid: {accessToken}");
@@ -86,8 +86,8 @@ namespace TwitchChatHueControls
             }
 
             Console.WriteLine("AccessToken is invalid, refreshing for a new token");
-            var refreshTokenJson = await jsonController.GetValueByKeyAsync("RefreshToken");
-            var refreshToken = refreshTokenJson.GetValue<string>();
+            JsonNode? refreshTokenJson = await jsonController.GetValueByKeyAsync("RefreshToken");
+            string refreshToken = refreshTokenJson.GetValue<string>();
 
             if (!string.IsNullOrEmpty(refreshToken))
             {
@@ -137,7 +137,7 @@ namespace TwitchChatHueControls
             var auth = await server.Listen();
 
             // exchange auth code for oauth access/refresh
-            var resp = await Api.Auth.GetAccessTokenFromCodeAsync(auth.Code, config.ClientSecret, config.RedirectUri);
+            var resp = await Api.Auth.GetAccessTokenFromCodeAsync("", config.ClientSecret, config.RedirectUri);
 
             // update TwitchLib's api with the recently acquired access token
             Api.Settings.AccessToken = resp.AccessToken;

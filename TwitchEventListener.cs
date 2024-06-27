@@ -259,10 +259,6 @@ public class TwitchEventSubListener
         {
             userInput = userInput.Replace("#", "");
         }
-        if (userInput.Length > 6)
-        {
-            userInput = userInput[..6];
-        }
         return userInput;
     }
 
@@ -282,7 +278,7 @@ public class TwitchEventSubListener
             {
                 broadcaster_id = _channelId,
                 sender_id = _channelId,
-                message = $"@{RedeemUsername} Sorry that color is not currently supported or you used an invalid hexcode for a color.",
+                message = $"@{RedeemUsername} Unfortunately it appears that {color} is not currently supported, or an invalid hex code was provided. Please try another color or ensure the hex code is correct.",
             };
             string ErrorChatMessageJson = JsonConvert.SerializeObject(ErrorChatMessage);
             var response = await _twitchHttpClient.PostAsync("ChatMessage", ErrorChatMessageJson);

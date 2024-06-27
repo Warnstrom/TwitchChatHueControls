@@ -132,7 +132,6 @@ public class HueController : IDisposable
                     jsonObject["AppKey"] = _appKey;
                 }
             });
-            //Console.WriteLine($"App Key: {_appKey}");
             return true;
         }
         else if (result.TryGetProperty("error", out JsonElement error))
@@ -185,7 +184,6 @@ public class HueController : IDisposable
     }
     public async Task<HueResponse<Light>> GetLightsAsync()
     {
-        //_hueClient.SetLightNameAsync();
         return await _hueClient.GetLightsAsync();
     }
 
@@ -214,12 +212,6 @@ public class HueController : IDisposable
         UpdateLight req;
         req = new UpdateLight().TurnOn().SetColor(new RGBColor(color));
         await _hueClient.UpdateLightAsync(LightGuid, req);
-    }
-
-    public async Task SetLightBrightnessAsync(Guid lightId, byte brightness)
-    {
-        var command = new UpdateLight().SetBrightness(brightness);
-        await _hueClient.UpdateLightAsync(lightId, command);
     }
 
     public void Dispose()
