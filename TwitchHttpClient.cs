@@ -2,9 +2,12 @@ using System.Text;
 
     public class TwitchHttpClient
     {
+        Dictionary<string, string> TwitchTypeToUrlMap = new Dictionary<string, string>(){
+            {"AddSubscription", "https://api.twitch.tv/helix/eventsub/subscriptions"},
+            {"ChatMessage", "https://api.twitch.tv/helix/chat/messages"},
+        };
         private readonly HttpClient _httpClient;
         private readonly string _clientId;
-        private readonly string _twitchEventSubscriptionUrl = "https://api.twitch.tv/helix/eventsub/subscriptions";
 
         public TwitchHttpClient(string clientId, string oauthToken)
         {
@@ -14,11 +17,12 @@ using System.Text;
             _httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + oauthToken);
         }
 
-        public async Task<HttpResponseMessage> PostAsync(string message)
+        public async Task<HttpResponseMessage> PostAsync(string type, string message)
         {
             try
             {
-                HttpResponseMessage response = await _httpClient.PostAsync(_twitchEventSubscriptionUrl, new StringContent(message, Encoding.UTF8, "application/json"));
+                TwitchTypeToUrlMap.TryGetValue(type, out string url);
+                HttpResponseMessage response = await _httpClient.PostAsync(url, new StringContent(message, Encoding.UTF8, "application/json"));
                 return response;
             }
             catch (HttpRequestException e)

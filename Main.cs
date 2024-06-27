@@ -9,9 +9,6 @@ namespace TwitchChatHueControls
         public string ClientId { get; set; }
         public string ClientSecret { get; set; }
         public string RedirectUri { get; set; }
-        public string AuthorizationEndpoint { get; set; } = "https://id.twitch.tv/oauth2/authorize";
-        public string TokenEndpoint { get; set; } = "https://id.twitch.tv/oauth2/token";
-        public string ValidateTokenEndpoint { get; set; } = "https://id.twitch.tv/oauth2/validate";
 
     }
     class Program
@@ -82,8 +79,7 @@ namespace TwitchChatHueControls
         {
             var jsonData = await jsonController.GetValueByKeyAsync("AccessToken");
             var accessToken = jsonData.GetValue<string>();
-
-            if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync(accessToken) != null)
+            if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync("accessToken") != null)
             {
                 //Console.WriteLine($"AccessToken is Valid: {accessToken}");
                 return true;
@@ -117,12 +113,11 @@ namespace TwitchChatHueControls
 
         private static async Task StartApp()
         {
-            bool result = await hueController.StartPollingForLinkButton("MyApp", "MyDevice");
+            bool result = await hueController.StartPollingForLinkButton("YukiDanceParty", "MyDevice");
             if (result == true)
             {
                 JsonNode AccessTokenJson = await jsonController.GetValueByKeyAsync("AccessToken");
                 string AccessToken = AccessTokenJson.GetValue<string>();
-
                 TwitchEventSubListener eventSubListener = new(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
                 await eventSubListener.ConnectAsync();
                 await eventSubListener.ListenForEventsAsync();
@@ -130,7 +125,7 @@ namespace TwitchChatHueControls
         }
         public static async Task ConnectToTwitchEvents()
         {
-            List<String> scopes = ["channel:bot", "user:read:chat", "channel:read:redemptions"];
+            List<String> scopes = ["channel:bot", "user:read:chat", "channel:read:redemptions", "user:write:chat"];
 
             Api.Settings.ClientId = config.ClientId;
 
@@ -147,7 +142,7 @@ namespace TwitchChatHueControls
             // update TwitchLib's api with the recently acquired access token
             Api.Settings.AccessToken = resp.AccessToken;
 
-
+            // update JSON FIle with the Access and RefreshTokens
             await jsonController.UpdateAsync(jsonNode =>
             {
 
@@ -171,9 +166,11 @@ namespace TwitchChatHueControls
             var encodedRedirectUri = System.Web.HttpUtility.UrlEncode(redirectUri);
             return "https://id.twitch.tv/oauth2/authorize?" +
                 $"client_id={clientId}&" +
+                $"force_verify=true&" +
                 $"redirect_uri={encodedRedirectUri}&" +
                 "response_type=code&" +
-                $"scope={scopesStr}";
+                $"scope={scopesStr}&"+
+                $"state=V3ab9Va609ea11e793ae92331f023611";
         }
 
         public static async Task ConfigureHueApplicationKey()

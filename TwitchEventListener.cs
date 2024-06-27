@@ -2,9 +2,10 @@ using System.Net.WebSockets;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using HueApi.Models;
+using System.Text.RegularExpressions;
 public class TwitchEventSubListener
 {
+    private Regex ValidHexCodePattern = new Regex("([0-9a-fA-F]{6})$");
     private readonly string _clientId;
     private readonly string _channelId;
     private readonly string _oauthToken;
@@ -26,14 +27,15 @@ public class TwitchEventSubListener
         var localWS = new Uri("ws://127.0.0.1:8080/ws");
         var twitchWS = new Uri("wss://eventsub.wss.twitch.tv/ws");
         _webSocket = new ClientWebSocket();
-        _webSocket.Options.SetRequestHeader("Client-ID", _clientId);
+        _webSocket.Options.SetRequestHeader("Client-Id", _clientId);
         _webSocket.Options.SetRequestHeader("Authorization", "Bearer " + _oauthToken);
+        _webSocket.Options.SetRequestHeader("Content-Type", "application/json");
         await _webSocket.ConnectAsync(twitchWS, CancellationToken.None);
     }
 
     public async Task SubscribeToChannelPointRewardsAsync(string sessionId)
     {
-        Console.WriteLine(sessionId);
+
         var subscribeMessage = new
         {
             type = "channel.channel_points_custom_reward_redemption.add",
@@ -79,14 +81,14 @@ public class TwitchEventSubListener
     {
         try
         {
-            HttpResponseMessage response = await _twitchHttpClient.PostAsync(message);
+            HttpResponseMessage response = await _twitchHttpClient.PostAsync("AddSubscription", message);
             if (response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"Twitch Event {type} Subscription created successfully.");
             }
             else
             {
-                Console.WriteLine("Failed to create Twitch Event Subscription. Status code: " + response.StatusCode);
+                Console.WriteLine($"Failed to create {type} Twitch Event Subscription. Status code: " + response.StatusCode);
             }
         }
         catch (HttpRequestException e)
@@ -109,8 +111,8 @@ public class TwitchEventSubListener
 
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
-                Console.WriteLine(result.CloseStatus);
-                Console.WriteLine(result.CloseStatusDescription);
+                    Console.WriteLine(result.CloseStatus);
+                    Console.WriteLine(result.CloseStatusDescription);
                     // Handle WebSocket closure
                     break;
                 }
@@ -165,14 +167,11 @@ public class TwitchEventSubListener
 
         if (handlers.TryGetValue(messageType, out var handler))
         {
-            //string sessionId = payload["payload"]["session"]["id"].ToString();
-            //Console.WriteLine($"Session Id: {sessionId}");
             await handler(payload);
         }
         else
         {
             Console.WriteLine("Unhandled message type: " + messageType);
-            Console.WriteLine(payload);
         }
     }
 
@@ -183,100 +182,116 @@ public class TwitchEventSubListener
         await SubscribeToChannelChatMessagesAsync(sessionId);
     }
 
-   private async Task HandleNotificationAsync(JObject payload)
-{
-    try
+    private async Task HandleNotificationAsync(JObject payload)
     {
-        var lights = await _hueController.GetLightsAsync();
-        var light = lights.Data.Last();
-
-        // Handle notification event here
-        string eventType = payload["payload"]["subscription"]["type"].ToString();
-
-        switch (eventType)
+        try
         {
-            case "channel.channel_points_custom_reward_redemption.add":
-                await HandleCustomRewardRedemptionAsync(payload);
+            string eventType = payload["payload"]["subscription"]["type"].ToString();
+            switch (eventType)
+            {
+                case "channel.channel_points_custom_reward_redemption.add":
+                    await HandleCustomRewardRedemptionAsync(payload);
+                    break;
+                case "channel.chat.message":
+                    break;
+                default:
+                    Console.WriteLine("Unhandled event type: " + eventType);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error handling notification: " + ex.Message);
+        }
+    }
+
+    private async Task HandleCustomRewardRedemptionAsync(JObject payload)
+    {
+        string RewardTitle = payload["payload"]["event"]["reward"]["title"].ToString();
+        string UserInput = payload["payload"]["event"]["user_input"].ToString();
+        string RedeemUsername = payload["payload"]["event"]["user_name"].ToString();
+        string UserInputCleaned = CleanUserInput(UserInput);
+        switch (RewardTitle)
+        {
+            case "Color":
+                await HandleColorCommandAsync("left", UserInputCleaned, RedeemUsername);
                 break;
-            case "channel.chat.message":
-                await HandleChatMessageAsync(payload, light);
+            case "Change left lamp color":
+                await HandleColorCommandAsync("left", UserInputCleaned, RedeemUsername);
+                break;
+            case "Change right lamp color":
+                await HandleColorCommandAsync("right", UserInputCleaned, RedeemUsername);
+                break;
+            case "Turn left lamp on/off":
+                //await HandlePowerCommandAsync(userInput, light);
+                break;
+            case "Turn right lamp on/off":
+                //await HandlePowerCommandAsync(userInput, light);
                 break;
             default:
-                Console.WriteLine("Unhandled event type: " + eventType);
+                Console.WriteLine("Unknown command: " + RewardTitle);
                 break;
         }
     }
-    catch (Exception ex)
+
+    private async Task HandlePowerCommandAsync(string[] commandAndAction)
     {
-        // Log the exception (you can replace this with your preferred logging mechanism)
-        Console.WriteLine("Error handling notification: " + ex.Message);
-    }
-}
 
-private async Task HandleCustomRewardRedemptionAsync(JObject payload)
-{
-    string rewardPrompt = payload["payload"]["event"]["reward"]["prompt"].ToString();
-    string rewardTitle = payload["payload"]["event"]["reward"]["title"].ToString();
-    Console.WriteLine(rewardTitle);
-    Console.WriteLine(rewardPrompt);
-}
+        string action = commandAndAction[1].ToLower();
 
-private async Task HandleChatMessageAsync(JObject payload, Light light)
-{
-    string messageText = payload["payload"]["event"]["message"]["text"].ToString();
-    string[] commandAndAction = messageText.Split(" ");
-
-    string command = commandAndAction[0].ToLower();
-
-    switch (command)
-    {
-        case "color":
-            await HandleColorCommandAsync(commandAndAction, light);
-            break;
-        case "power":
-            await HandlePowerCommandAsync(commandAndAction, light);
-            break;
-        default:
-            Console.WriteLine("Unknown command: " + command);
-            break;
-    }
-}
-
-private async Task HandleColorCommandAsync(string[] commandAndAction, Light light)
-{
-    if (commandAndAction.Length < 2)
-    {
-        Console.WriteLine("Invalid color command");
-        return;
+        switch (action)
+        {
+            case "on":
+                break;
+            case "off":
+                //await _hueController.TurnOffLightAsync(light.Id);
+                break;
+            default:
+                Console.WriteLine("Unknown power action: " + action);
+                break;
+        }
     }
 
-    string color = commandAndAction[1].ToLower();
-    await _hueController.SetLightColorAsync(light.Id, color);
-}
-
-private async Task HandlePowerCommandAsync(string[] commandAndAction, Light light)
-{
-    if (commandAndAction.Length < 2)
+    private static string CleanUserInput(string userInput)
     {
-        Console.WriteLine("Invalid power command");
-        return;
+        userInput = userInput.Trim().ToLower();
+        if (userInput.Contains('#'))
+        {
+            userInput = userInput.Replace("#", "");
+        }
+        if (userInput.Length > 6)
+        {
+            userInput = userInput[..6];
+        }
+        return userInput;
     }
 
-    string action = commandAndAction[1].ToLower();
-
-    switch (action)
+    private async Task HandleColorCommandAsync(string lamp, string color, string RedeemUsername)
     {
-        case "on":
-            await _hueController.TurnOnLightAsync(light.Id);
-            break;
-        case "off":
-            await _hueController.TurnOffLightAsync(light.Id);
-            break;
-        default:
-            Console.WriteLine("Unknown power action: " + action);
-            break;
+        string? BaseColor = HexColorMapDictionary.Get(color);
+        if (BaseColor != null)
+        {  
+            await _hueController.SetLightColorAsync(lamp, BaseColor);
+        }
+        else if (ValidHexCodePattern.IsMatch(color))
+        {
+            await _hueController.SetLightColorAsync(lamp, color);
+        } else 
+        {
+            var ErrorChatMessage = new
+            {
+                broadcaster_id = _channelId,
+                sender_id = _channelId,
+                message = $"@{RedeemUsername} Sorry that color is not currently supported or you used an invalid hexcode for a color.",
+            };
+            string ErrorChatMessageJson = JsonConvert.SerializeObject(ErrorChatMessage);
+            var response = await _twitchHttpClient.PostAsync("ChatMessage", ErrorChatMessageJson);
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to send message. Status code: " + response.StatusCode);
+            }
+        }
     }
-}
 
     private Task HandleKeepAliveAsync(JObject payload)
     {
