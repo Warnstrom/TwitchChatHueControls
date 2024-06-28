@@ -12,6 +12,8 @@ public class TwitchEventSubListener
     private ClientWebSocket _webSocket;
     private readonly TwitchHttpClient _twitchHttpClient;
     private HueController _hueController;
+    private readonly Uri _localWS = new Uri("ws://127.0.0.1:8080/ws");
+    private readonly Uri _twitchWS = new Uri("wss://eventsub.wss.twitch.tv/ws");
 
     public TwitchEventSubListener(string clientId, string channelId, string oauthToken, HueController hueController)
     {
@@ -24,13 +26,11 @@ public class TwitchEventSubListener
 
     public async Task ConnectAsync()
     {
-        var localWS = new Uri("ws://127.0.0.1:8080/ws");
-        var twitchWS = new Uri("wss://eventsub.wss.twitch.tv/ws");
         _webSocket = new ClientWebSocket();
         _webSocket.Options.SetRequestHeader("Client-Id", _clientId);
         _webSocket.Options.SetRequestHeader("Authorization", "Bearer " + _oauthToken);
         _webSocket.Options.SetRequestHeader("Content-Type", "application/json");
-        await _webSocket.ConnectAsync(twitchWS, CancellationToken.None);
+        await _webSocket.ConnectAsync(_twitchWS, CancellationToken.None);
     }
 
     public async Task SubscribeToChannelPointRewardsAsync(string sessionId)
@@ -162,6 +162,7 @@ public class TwitchEventSubListener
         {
             { "session_welcome", HandleSessionWelcomeAsync },
             { "session_keepalive", HandleKeepAliveAsync },
+            { "session_reconnect", HandleReconnectAsync },
             { "notification", HandleNotificationAsync }
         };
 
@@ -179,7 +180,7 @@ public class TwitchEventSubListener
     {
         string sessionId = (string)payload["payload"]["session"]["id"];
         await SubscribeToChannelPointRewardsAsync(sessionId);
-        await SubscribeToChannelChatMessagesAsync(sessionId);
+        //await SubscribeToChannelChatMessagesAsync(sessionId);
     }
 
     private async Task HandleNotificationAsync(JObject payload)
@@ -213,9 +214,6 @@ public class TwitchEventSubListener
         string UserInputCleaned = CleanUserInput(UserInput);
         switch (RewardTitle)
         {
-            case "Color":
-                await HandleColorCommandAsync("left", UserInputCleaned, RedeemUsername);
-                break;
             case "Change left lamp color":
                 await HandleColorCommandAsync("left", UserInputCleaned, RedeemUsername);
                 break;
@@ -287,6 +285,10 @@ public class TwitchEventSubListener
                 Console.WriteLine($"Failed to send message. Status code: " + response.StatusCode);
             }
         }
+    }
+    private async Task HandleReconnectAsync(JObject payload)
+    {
+        Console.WriteLine(payload);
     }
 
     private Task HandleKeepAliveAsync(JObject payload)

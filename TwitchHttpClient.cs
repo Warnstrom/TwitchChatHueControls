@@ -2,7 +2,7 @@ using System.Text;
 
     public class TwitchHttpClient
     {
-        Dictionary<string, string> TwitchTypeToUrlMap = new Dictionary<string, string>(){
+    readonly Dictionary<string, string> TwitchTypeToUrlMap = new Dictionary<string, string>(){
             {"AddSubscription", "https://api.twitch.tv/helix/eventsub/subscriptions"},
             {"ChatMessage", "https://api.twitch.tv/helix/chat/messages"},
         };

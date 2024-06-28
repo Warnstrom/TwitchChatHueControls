@@ -158,14 +158,14 @@ public class HueController : IDisposable
                 _isPolling = false;
                 _pollingTaskCompletionSource.SetResult(true);
                 _hueClient = new LocalHueApi(_bridgeIp, _appKey);
-                Console.WriteLine("Successfully registered with the Hue Bridge.\n");
+                Console.WriteLine($"Successfully registered with the Hue Bridge ({_bridgeIp}).\n");
                 _lights = await GetLightsAsync();
                 if (_lights.Data.Count != 0)
                 {
-                    Console.WriteLine("Found lamps:");
+                    Console.WriteLine("Found devices:");
                     _lights.Data.ForEach(light =>
                     {
-                        Console.WriteLine(light.Metadata.Name + "\n");
+                        Console.WriteLine($"Name: {light.Metadata.Name} - Type: {light.Type}\n");
                         LightMap.Add(light.Metadata.Name, light.Id);
                     });
                 }

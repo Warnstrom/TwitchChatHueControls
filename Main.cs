@@ -101,6 +101,7 @@ namespace TwitchChatHueControls
                         jsonObject["AccessToken"] = refresh.AccessToken;
                     }
                 });
+                return true;
             }
 
             return false;
@@ -108,7 +109,7 @@ namespace TwitchChatHueControls
 
         private static string GetConfiguredSymbol(bool isConfigured)
         {
-            return isConfigured ? "✔" : "✘";
+            return isConfigured ? "\u2713" : "\u2715";
         }
 
         private static async Task StartApp()
@@ -137,7 +138,7 @@ namespace TwitchChatHueControls
             var auth = await server.Listen();
 
             // exchange auth code for oauth access/refresh
-            var resp = await Api.Auth.GetAccessTokenFromCodeAsync("", config.ClientSecret, config.RedirectUri);
+            var resp = await Api.Auth.GetAccessTokenFromCodeAsync(auth.Code, config.ClientSecret, config.RedirectUri);
 
             // update TwitchLib's api with the recently acquired access token
             Api.Settings.AccessToken = resp.AccessToken;
