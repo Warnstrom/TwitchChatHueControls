@@ -109,7 +109,7 @@ namespace TwitchChatHueControls
 
         private static string GetConfiguredSymbol(bool isConfigured)
         {
-            return isConfigured ? "\u2713" : "\u2715";
+            return isConfigured ? "Complete" : "Incomplete";
         }
 
         private static async Task StartApp()
