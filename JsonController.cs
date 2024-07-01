@@ -70,4 +70,24 @@ public class JsonFileController
 
         return null;
     }
+
+        public async Task<Dictionary<string, string>> ReadAsDictionaryAsync()
+    {
+        JsonNode? jsonNode = await ReadAsync();
+
+        Dictionary<string, string> dictionary = new Dictionary<string, string>();
+
+        if (jsonNode is JsonObject jsonObject)
+        {
+            foreach (var kvp in jsonObject)
+            {
+                if (kvp.Value is JsonValue value && value.TryGetValue(out string? stringValue))
+                {
+                    dictionary[kvp.Key] = stringValue;
+                }
+            }
+        }
+
+        return dictionary;
+    }
 }
