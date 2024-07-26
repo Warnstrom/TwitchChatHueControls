@@ -16,10 +16,10 @@ namespace TwitchChatHueControls
         private static TwitchLib.Api.TwitchAPI Api { get; set; } = new TwitchLib.Api.TwitchAPI();
         private static HueController? hueController;
         private static readonly JsonFileController jsonController = new("tokens.json");
-
         private static TwitchOAuthConfig? config;
         static async Task Main(string[] args)
         {
+
             Env.Load();
             config = new()
             {
@@ -68,11 +68,45 @@ namespace TwitchChatHueControls
             Console.WriteLine("3. Start Bot");
         }
 
-        private static async Task<bool> ValidateHueConfiguration()
+        public async static Task<bool> ValidateHueConfiguration()
         {
-            JsonNode? jsonData = await jsonController.GetValueByKeyAsync("bridgeIp");
-            hueController.SetBridgeIp(jsonData.GetValue<string>());
-            return !string.IsNullOrEmpty(jsonData.GetValue<string>());
+            try
+            {
+                JsonNode? bridgeIp = await jsonController.GetValueByKeyAsync("bridgeIp");
+                JsonNode? bridgeId = await jsonController.GetValueByKeyAsync("bridgeId");
+                JsonNode? appKey = await jsonController.GetValueByKeyAsync("AppKey");
+
+
+                string bridgeIpValue = bridgeIp.GetValue<string>();
+                string bridgeIdValue = bridgeId.GetValue<string>();
+                string appKeyValue = appKey.GetValue<string>();
+
+                if (string.IsNullOrEmpty(bridgeIpValue))
+                {
+                    Console.WriteLine("Error: bridgeIp is empty.");
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(bridgeIdValue))
+                {
+                    Console.WriteLine("Error: bridgeId is empty.");
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(appKeyValue))
+                {
+                    Console.WriteLine("Error: AppKey is empty.");
+                    return false;
+                }
+
+                Console.WriteLine("Configuration is valid.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error: {ex.Message}");
+                return false;
+            }
         }
 
         private static async Task<bool> ValidateTwitchConfiguration(TwitchLib.Api.TwitchAPI api)
@@ -114,13 +148,21 @@ namespace TwitchChatHueControls
 
         private static async Task StartApp()
         {
-            bool result = await hueController.StartPollingForLinkButton("YukiDanceParty", "MyDevice");
+            JsonNode? bridgeIp = await jsonController.GetValueByKeyAsync("bridgeIp");
+            string bridgeIpValue = bridgeIp.GetValue<string>();
+            JsonNode? appKey = await jsonController.GetValueByKeyAsync("AppKey");
+            string appKeyValue = appKey.GetValue<string>();
+
+            bool result = await hueController.StartPollingForLinkButtonAsync("YukiDanceParty", "MyDevice", bridgeIpValue, appKeyValue);
             if (result == true)
             {
                 JsonNode AccessTokenJson = await jsonController.GetValueByKeyAsync("AccessToken");
                 string AccessToken = AccessTokenJson.GetValue<string>();
-                TwitchEventSubListener eventSubListener = new(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
-                await eventSubListener.ConnectAsync();
+                TwitchEventSubListener eventSubListener = new TwitchEventSubListener(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
+                const string wsstring = "wss://eventsub.wss.twitch.tv/ws";
+                const string localwsstring = "ws://127.0.0.1:8080/ws";
+                await eventSubListener.ConnectAsync(new Uri(localwsstring));
+
                 await eventSubListener.ListenForEventsAsync();
             }
         }
@@ -170,7 +212,7 @@ namespace TwitchChatHueControls
                 $"force_verify=true&" +
                 $"redirect_uri={encodedRedirectUri}&" +
                 "response_type=code&" +
-                $"scope={scopesStr}&"+
+                $"scope={scopesStr}&" +
                 $"state=V3ab9Va609ea11e793ae92331f023611";
         }
 

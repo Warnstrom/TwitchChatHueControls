@@ -27,6 +27,7 @@ public class JsonFileController
             var defaultJson = new
             {
                 bridgeIp = "",
+                bridgeId = "",
                 AccessToken = "",
                 RefreshToken = "",
                 AppKey = ""

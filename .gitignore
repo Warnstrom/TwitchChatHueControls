@@ -4,3 +4,7 @@
 /obj
 /tokens.json
 /.env
+huebridge_cacert.pem
+TwitchChatHueControls.csproj
+TwitchChatHueControls.sln
+Add redeems Change left.txt

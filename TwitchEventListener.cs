@@ -5,15 +5,13 @@ using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 public class TwitchEventSubListener
 {
-    private Regex ValidHexCodePattern = new Regex("([0-9a-fA-F]{6})$");
+    private readonly Regex ValidHexCodePattern = new Regex("([0-9a-fA-F]{6})$");
     private readonly string _clientId;
     private readonly string _channelId;
     private readonly string _oauthToken;
     private ClientWebSocket _webSocket;
     private readonly TwitchHttpClient _twitchHttpClient;
     private HueController _hueController;
-    private readonly Uri _localWS = new Uri("ws://127.0.0.1:8080/ws");
-    private readonly Uri _twitchWS = new Uri("wss://eventsub.wss.twitch.tv/ws");
 
     public TwitchEventSubListener(string clientId, string channelId, string oauthToken, HueController hueController)
     {
@@ -24,13 +22,13 @@ public class TwitchEventSubListener
         _twitchHttpClient = new TwitchHttpClient(clientId, _oauthToken.Split(":")[1]);
     }
 
-    public async Task ConnectAsync()
+    public async Task ConnectAsync(Uri websocketUrl)
     {
         _webSocket = new ClientWebSocket();
         _webSocket.Options.SetRequestHeader("Client-Id", _clientId);
         _webSocket.Options.SetRequestHeader("Authorization", "Bearer " + _oauthToken);
         _webSocket.Options.SetRequestHeader("Content-Type", "application/json");
-        await _webSocket.ConnectAsync(_twitchWS, CancellationToken.None);
+        await _webSocket.ConnectAsync(websocketUrl, CancellationToken.None);
     }
 
     public async Task SubscribeToChannelPointRewardsAsync(string sessionId)
@@ -52,11 +50,12 @@ public class TwitchEventSubListener
         };
 
         string subscribeMessageJson = JsonConvert.SerializeObject(subscribeMessage);
-        await SendMessageAsync(subscribeMessageJson, "channel.channel_points_custom_reward_redemption.add");
+        await SendMessageAsync(subscribeMessageJson, "channel.chat.message");
     }
 
-    public async Task SubscribeToChannelChatMessagesAsync(string sessionId)
+    public async Task SubscribeToChannelChatMessageAsync(string sessionId)
     {
+
         var subscribeMessage = new
         {
             type = "channel.chat.message",
@@ -64,7 +63,7 @@ public class TwitchEventSubListener
             condition = new
             {
                 broadcaster_user_id = _channelId,
-                user_id = _channelId
+                user_id = _channelId,
             },
             transport = new
             {
@@ -156,6 +155,7 @@ public class TwitchEventSubListener
     private async Task HandleEventNotificationAsync(string payloadJson)
     {
         var payload = JObject.Parse(payloadJson);
+        Console.WriteLine(payload);
         string messageType = (string)payload["metadata"]["message_type"];
 
         var handlers = new Dictionary<string, Func<JObject, Task>>
@@ -179,8 +179,8 @@ public class TwitchEventSubListener
     private async Task HandleSessionWelcomeAsync(JObject payload)
     {
         string sessionId = (string)payload["payload"]["session"]["id"];
-        await SubscribeToChannelPointRewardsAsync(sessionId);
-        //await SubscribeToChannelChatMessagesAsync(sessionId);
+        //await SubscribeToChannelPointRewardsAsync(sessionId);
+        await SubscribeToChannelChatMessageAsync(sessionId);
     }
 
     private async Task HandleNotificationAsync(JObject payload)
@@ -194,6 +194,7 @@ public class TwitchEventSubListener
                     await HandleCustomRewardRedemptionAsync(payload);
                     break;
                 case "channel.chat.message":
+                    Console.WriteLine(payload);
                     break;
                 default:
                     Console.WriteLine("Unhandled event type: " + eventType);
@@ -211,41 +212,16 @@ public class TwitchEventSubListener
         string RewardTitle = payload["payload"]["event"]["reward"]["title"].ToString();
         string UserInput = payload["payload"]["event"]["user_input"].ToString();
         string RedeemUsername = payload["payload"]["event"]["user_name"].ToString();
-        string UserInputCleaned = CleanUserInput(UserInput);
         switch (RewardTitle)
         {
             case "Change left lamp color":
-                await HandleColorCommandAsync("left", UserInputCleaned, RedeemUsername);
+                await HandleColorCommandAsync("left", CleanUserInput(UserInput), RedeemUsername);
                 break;
             case "Change right lamp color":
-                await HandleColorCommandAsync("right", UserInputCleaned, RedeemUsername);
-                break;
-            case "Turn left lamp on/off":
-                //await HandlePowerCommandAsync(userInput, light);
-                break;
-            case "Turn right lamp on/off":
-                //await HandlePowerCommandAsync(userInput, light);
+                await HandleColorCommandAsync("right", CleanUserInput(UserInput), RedeemUsername);
                 break;
             default:
                 Console.WriteLine("Unknown command: " + RewardTitle);
-                break;
-        }
-    }
-
-    private async Task HandlePowerCommandAsync(string[] commandAndAction)
-    {
-
-        string action = commandAndAction[1].ToLower();
-
-        switch (action)
-        {
-            case "on":
-                break;
-            case "off":
-                //await _hueController.TurnOffLightAsync(light.Id);
-                break;
-            default:
-                Console.WriteLine("Unknown power action: " + action);
                 break;
         }
     }
@@ -288,6 +264,13 @@ public class TwitchEventSubListener
     }
     private async Task HandleReconnectAsync(JObject payload)
     {
+        await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
+
+        string ReconnectUrl = payload["payload"]["session"]["reconnect_url"].ToString();
+        Uri uri = new Uri(ReconnectUrl);
+        await _webSocket.ConnectAsync(uri, CancellationToken.None);
+        await ListenForEventsAsync();
+        
         Console.WriteLine(payload);
     }
 
