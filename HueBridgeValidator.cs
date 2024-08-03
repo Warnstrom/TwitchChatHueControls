@@ -36,6 +36,10 @@ public class BridgeValidator
 
     public async Task<bool> ValidateBridgeIpAsync(string bridgeId, string bridgeIp, string appKey)
     {
+        if (string.IsNullOrEmpty(bridgeId) || string.IsNullOrEmpty(appKey)) {
+            return false;
+        }
+        
         string url = $"https://{bridgeId}/api/{appKey}/config";
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var validatedUri) || (validatedUri.Scheme != Uri.UriSchemeHttps))

@@ -42,12 +42,9 @@ namespace TwitchChatHueControls
                 switch (choice)
                 {
                     case "1":
-                        await ConfigureHueApplicationKey();
+                        await ConfigureTwitchTokens();
                         break;
                     case "2":
-                        await ConnectToTwitchEvents();
-                        break;
-                    case "3":
                         await StartApp();
                         break;
                     default:
@@ -60,52 +57,24 @@ namespace TwitchChatHueControls
         private static async Task RenderStartMenu()
         {
             bool twitchConfigured = await ValidateTwitchConfiguration(Api);
-            bool hueConfigured = await ValidateHueConfiguration();
+            await ValidateHueConfiguration();
             Console.WriteLine("Welcome To Yuki's Disco Lights");
             Console.WriteLine("Select an option:");
-            Console.WriteLine($"1. Configure Hue Application ({GetConfiguredSymbol(hueConfigured)})");
-            Console.WriteLine($"2. Connect to Twitch ({GetConfiguredSymbol(twitchConfigured)})");
-            Console.WriteLine("3. Start Bot");
+            Console.WriteLine($"1. Connect to Twitch ({GetConfiguredSymbol(twitchConfigured)})");
+            Console.WriteLine("2. Start Bot");
         }
 
-        public async static Task<bool> ValidateHueConfiguration()
+        public async static Task ValidateHueConfiguration()
         {
-            try
+            JsonNode? bridgeIp = await jsonController.GetValueByKeyAsync("bridgeIp");
+            JsonNode? bridgeId = await jsonController.GetValueByKeyAsync("bridgeId");
+
+            string bridgeIpValue = bridgeIp.GetValue<string>();
+            string bridgeIdValue = bridgeId.GetValue<string>();
+
+            if (string.IsNullOrEmpty(bridgeIpValue) || string.IsNullOrEmpty(bridgeIdValue))
             {
-                JsonNode? bridgeIp = await jsonController.GetValueByKeyAsync("bridgeIp");
-                JsonNode? bridgeId = await jsonController.GetValueByKeyAsync("bridgeId");
-                JsonNode? appKey = await jsonController.GetValueByKeyAsync("AppKey");
-
-
-                string bridgeIpValue = bridgeIp.GetValue<string>();
-                string bridgeIdValue = bridgeId.GetValue<string>();
-                string appKeyValue = appKey.GetValue<string>();
-
-                if (string.IsNullOrEmpty(bridgeIpValue))
-                {
-                    Console.WriteLine("Error: bridgeIp is empty.");
-                    return false;
-                }
-
-                if (string.IsNullOrEmpty(bridgeIdValue))
-                {
-                    Console.WriteLine("Error: bridgeId is empty.");
-                    return false;
-                }
-
-                if (string.IsNullOrEmpty(appKeyValue))
-                {
-                    Console.WriteLine("Error: AppKey is empty.");
-                    return false;
-                }
-
-                Console.WriteLine("Configuration is valid.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Unexpected error: {ex.Message}");
-                return false;
+                await hueController.DiscoverBridgeAsync();
             }
         }
 
@@ -113,29 +82,31 @@ namespace TwitchChatHueControls
         {
             JsonNode? jsonData = await jsonController.GetValueByKeyAsync("AccessToken");
             string accessToken = jsonData.GetValue<string>();
+            Console.WriteLine(await api.Auth.ValidateAccessTokenAsync("accessToken"));
             if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync("accessToken") != null)
             {
-                //Console.WriteLine($"AccessToken is Valid: {accessToken}");
                 return true;
             }
-
-            Console.WriteLine("AccessToken is invalid, refreshing for a new token");
-            JsonNode? refreshTokenJson = await jsonController.GetValueByKeyAsync("RefreshToken");
-            string refreshToken = refreshTokenJson.GetValue<string>();
-
-            if (!string.IsNullOrEmpty(refreshToken))
+            else
             {
-                var refresh = await api.Auth.RefreshAuthTokenAsync(refreshToken, config.ClientSecret, config.ClientId);
-                api.Settings.AccessToken = refresh.AccessToken;
+                JsonNode? refreshTokenJson = await jsonController.GetValueByKeyAsync("RefreshToken");
+                string refreshToken = refreshTokenJson.GetValue<string>();
 
-                await jsonController.UpdateAsync(jsonNode =>
+                if (!string.IsNullOrEmpty(refreshToken))
                 {
-                    if (jsonNode is JsonObject jsonObject)
+                    Console.WriteLine("AccessToken is invalid, refreshing for a new token");
+                    var refresh = await api.Auth.RefreshAuthTokenAsync(refreshToken, config.ClientSecret, config.ClientId);
+                    api.Settings.AccessToken = refresh.AccessToken;
+
+                    await jsonController.UpdateAsync(jsonNode =>
                     {
-                        jsonObject["AccessToken"] = refresh.AccessToken;
-                    }
-                });
-                return true;
+                        if (jsonNode is JsonObject jsonObject)
+                        {
+                            jsonObject["AccessToken"] = refresh.AccessToken;
+                        }
+                    });
+                    return true;
+                }
             }
 
             return false;
@@ -166,7 +137,7 @@ namespace TwitchChatHueControls
                 await eventSubListener.ListenForEventsAsync();
             }
         }
-        public static async Task ConnectToTwitchEvents()
+        public static async Task ConfigureTwitchTokens()
         {
             List<String> scopes = ["channel:bot", "user:read:chat", "channel:read:redemptions", "user:write:chat"];
 
@@ -214,12 +185,6 @@ namespace TwitchChatHueControls
                 "response_type=code&" +
                 $"scope={scopesStr}&" +
                 $"state=V3ab9Va609ea11e793ae92331f023611";
-        }
-
-        public static async Task ConfigureHueApplicationKey()
-        {
-            await hueController.DiscoverBridgeAsync();
-
         }
     }
 }

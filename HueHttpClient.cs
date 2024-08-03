@@ -35,24 +35,29 @@ public class HueController : IDisposable
         BridgeValidator validator = new();
         string localBridgeIp = await LoadBridgeIpFromConfigAsync();
         string localBridgeId = await LoadBridgeIdFromConfigAsync();
-        string localAppKey = await LoadAppKeyFromConfigAsync();
 
-        if (string.IsNullOrEmpty(localBridgeIp) || string.IsNullOrEmpty(localBridgeId) || string.IsNullOrEmpty(localAppKey))
+        if (string.IsNullOrEmpty(localBridgeIp) || string.IsNullOrEmpty(localBridgeId))
         {
             await GetAndSaveBridgeInfoAsync();
         }
 
-        bool validBridgeIp = await validator.ValidateBridgeIpAsync(localBridgeId, localBridgeIp, localAppKey);
+        if (!File.Exists("huebridge_cacert.pem"))
+        {
+            await CertificateService.ConfigureCertificate([_bridgeIp, "443", "huebridge_cacert.pem"]);
+        }
 
-        if (validBridgeIp)
-        {
-            _bridgeIp = localBridgeIp;
-            Console.WriteLine($"Loaded bridge IP from config file: {localBridgeIp}");
-        }
-        else
-        {
-            await GetAndSaveBridgeInfoAsync();
-        }
+            string localAppKey = await LoadAppKeyFromConfigAsync();
+            bool validBridgeIp = await validator.ValidateBridgeIpAsync(localBridgeId, localBridgeIp, localAppKey);
+
+            if (validBridgeIp)
+            {
+                _bridgeIp = localBridgeIp;
+                Console.WriteLine($"Loaded bridge IP from config file: {localBridgeIp}");
+            }
+            else
+            {
+                await GetAndSaveBridgeInfoAsync();
+            }
     }
 
     private async Task<string?> LoadBridgeIpFromConfigAsync()
@@ -91,7 +96,8 @@ public class HueController : IDisposable
         }
         else
         {
-
+            Console.WriteLine("No Bridges found.");
+            Console.WriteLine(bridgeIPs);
         }
     }
 
@@ -110,7 +116,7 @@ public class HueController : IDisposable
     {
         if (string.IsNullOrEmpty(_bridgeIp))
         {
-            throw new Exception("Bridge IP not set. Please discover the bridge first.");
+            await GetAndSaveBridgeInfoAsync();
         }
 
         string url = $"http://{_bridgeIp}/api";
@@ -148,7 +154,6 @@ public class HueController : IDisposable
         _pollingTaskCompletionSource = new TaskCompletionSource<bool>();
         if (string.IsNullOrEmpty(bridgeIp) || string.IsNullOrEmpty(appKey))
         {
-
             _pollingTaskCompletionSource = new TaskCompletionSource<bool>();
             _isPolling = true;
 
@@ -198,24 +203,6 @@ public class HueController : IDisposable
         {
             Console.WriteLine("Couldn't find any lamps!");
         }
-    }
-
-    public async Task TurnOnLightAsync(Guid lightId)
-    {
-        var command = new UpdateLight().TurnOn();
-        await _hueClient.UpdateLightAsync(lightId, command);
-    }
-
-    public async Task TurnOffLightAsync(Guid lightId)
-    {
-        var command = new UpdateLight().TurnOff();
-        await _hueClient.UpdateLightAsync(lightId, command);
-    }
-
-    public async Task UpdateLightBrightnessLevelAsync(Guid lightId, double brightness)
-    {
-        var command = new UpdateLight().TurnOn().SetBrightness(brightness);
-        await _hueClient.UpdateLightAsync(lightId, command);
     }
 
     public async Task SetLightColorAsync(string lamp, string color)

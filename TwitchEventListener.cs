@@ -3,6 +3,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
+using TwitchLib.PubSub.Extensions;
 public class TwitchEventSubListener
 {
     private readonly Regex ValidHexCodePattern = new Regex("([0-9a-fA-F]{6})$");
@@ -53,6 +54,8 @@ public class TwitchEventSubListener
         await SendMessageAsync(subscribeMessageJson, "channel.chat.message");
     }
 
+    // We subscribe to ChannelChatMessage only for local testing
+    // This is not used in production
     public async Task SubscribeToChannelChatMessageAsync(string sessionId)
     {
 
@@ -63,7 +66,7 @@ public class TwitchEventSubListener
             condition = new
             {
                 broadcaster_user_id = _channelId,
-                user_id = _channelId,
+                user_id = _channelId
             },
             transport = new
             {
@@ -155,9 +158,7 @@ public class TwitchEventSubListener
     private async Task HandleEventNotificationAsync(string payloadJson)
     {
         var payload = JObject.Parse(payloadJson);
-        Console.WriteLine(payload);
-        string messageType = (string)payload["metadata"]["message_type"];
-
+        string MessageType = (string)payload["metadata"]["message_type"];
         var handlers = new Dictionary<string, Func<JObject, Task>>
         {
             { "session_welcome", HandleSessionWelcomeAsync },
@@ -166,13 +167,18 @@ public class TwitchEventSubListener
             { "notification", HandleNotificationAsync }
         };
 
-        if (handlers.TryGetValue(messageType, out var handler))
+        if (handlers.TryGetValue(MessageType, out var handler))
         {
+            if (MessageType != "session_keepalive") {
+                Console.Write("Twitch Websocket Status: ");
+                Console.Write((string)payload["payload"]["session"]["status"]);
+                Console.Write("\n");
+            }
             await handler(payload);
         }
         else
         {
-            Console.WriteLine("Unhandled message type: " + messageType);
+            Console.WriteLine("Unhandled message type: " + MessageType);
         }
     }
 
@@ -194,7 +200,7 @@ public class TwitchEventSubListener
                     await HandleCustomRewardRedemptionAsync(payload);
                     break;
                 case "channel.chat.message":
-                    Console.WriteLine(payload);
+                    //Console.WriteLine(payload);
                     break;
                 default:
                     Console.WriteLine("Unhandled event type: " + eventType);
@@ -262,17 +268,31 @@ public class TwitchEventSubListener
             }
         }
     }
-    private async Task HandleReconnectAsync(JObject payload)
+private async Task HandleReconnectAsync(JObject payload)
+{
+    try
     {
-        await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
+        if (_webSocket.State == WebSocketState.Open)
+        {
+            await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
+        }
 
-        string ReconnectUrl = payload["payload"]["session"]["reconnect_url"].ToString();
-        Uri uri = new Uri(ReconnectUrl);
+        string reconnectUrl = payload["payload"]["session"]["reconnect_url"].ToString();
+        Uri uri = new Uri(reconnectUrl);
+
+        _webSocket = new ClientWebSocket();
+
         await _webSocket.ConnectAsync(uri, CancellationToken.None);
+
         await ListenForEventsAsync();
-        
-        Console.WriteLine(payload);
     }
+    catch (Exception ex)
+    {
+        // Handle any exceptions that occur during the reconnection process
+        Console.WriteLine($"Error during reconnection: {ex.Message}");
+    }
+}
+
 
     private Task HandleKeepAliveAsync(JObject payload)
     {
