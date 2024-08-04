@@ -83,7 +83,7 @@ namespace TwitchChatHueControls
             JsonNode? jsonData = await jsonController.GetValueByKeyAsync("AccessToken");
             string accessToken = jsonData.GetValue<string>();
             Console.WriteLine(await api.Auth.ValidateAccessTokenAsync("accessToken"));
-            if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync("accessToken") != null)
+            if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync(accessToken) != null)
             {
                 return true;
             }
@@ -119,6 +119,8 @@ namespace TwitchChatHueControls
 
         private static async Task StartApp()
         {
+            bool twitchConfigured = await ValidateTwitchConfiguration(Api);
+
             JsonNode? bridgeIp = await jsonController.GetValueByKeyAsync("bridgeIp");
             string bridgeIpValue = bridgeIp.GetValue<string>();
             JsonNode? appKey = await jsonController.GetValueByKeyAsync("AppKey");
