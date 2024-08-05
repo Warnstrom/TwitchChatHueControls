@@ -61,7 +61,7 @@ public class BridgeValidator
         }
         catch (HttpRequestException httpEx)
         {
-            Console.WriteLine($"Request error: {httpEx.Message}");
+            Console.WriteLine($"Request error: {httpEx.InnerException}");
         }
         catch (Exception ex)
         {

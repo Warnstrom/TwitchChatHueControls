@@ -169,11 +169,6 @@ public class TwitchEventSubListener
 
         if (handlers.TryGetValue(MessageType, out var handler))
         {
-            if (MessageType != "session_keepalive") {
-                Console.Write("Twitch Websocket Status: ");
-                Console.Write((string)payload["payload"]["session"]["status"]);
-                Console.Write("\n");
-            }
             await handler(payload);
         }
         else
@@ -275,13 +270,14 @@ private async Task HandleReconnectAsync(JObject payload)
         if (_webSocket.State == WebSocketState.Open)
         {
             await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
+            Console.WriteLine("Twitch EventSub Websocket Disconnecting...");
         }
 
         string reconnectUrl = payload["payload"]["session"]["reconnect_url"].ToString();
         Uri uri = new Uri(reconnectUrl);
 
         _webSocket = new ClientWebSocket();
-
+        Console.WriteLine("Twitch EventSub Websocket Reconnecting...");
         await _webSocket.ConnectAsync(uri, CancellationToken.None);
 
         await ListenForEventsAsync();

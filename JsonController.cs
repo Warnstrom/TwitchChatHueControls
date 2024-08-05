@@ -60,16 +60,30 @@ public class JsonFileController
         await WriteAsync(data);
     }
 
-        public async Task<JsonNode?> GetValueByKeyAsync(string key)
+   public async Task<T?> GetValueByKeyAsync<T>(string key)
     {
         JsonNode? jsonNode = await ReadAsync();
 
         if (jsonNode is JsonObject jsonObject && jsonObject.TryGetPropertyValue(key, out JsonNode? value))
         {
-            return value;
+            if (value is T typedValue)
+            {
+                return typedValue;
+            }
+
+            // Try to convert the value to the expected type
+            try
+            {
+                return value.Deserialize<T>();
+            }
+            catch
+            {
+                // Handle the case where the conversion fails
+                return default;
+            }
         }
 
-        return null;
+        return default;
     }
 
         public async Task<Dictionary<string, string>> ReadAsDictionaryAsync()

@@ -58,39 +58,81 @@ namespace TwitchChatHueControls
         {
             bool twitchConfigured = await ValidateTwitchConfiguration(Api);
             await ValidateHueConfiguration();
-            Console.WriteLine("Welcome To Yuki's Disco Lights");
-            Console.WriteLine("Select an option:");
-            Console.WriteLine($"1. Connect to Twitch ({GetConfiguredSymbol(twitchConfigured)})");
-            Console.WriteLine("2. Start Bot");
+
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine("╔══════════════════════════════════════╗");
+
+            Console.WriteLine("║           Welcome To Yuki's          ║");
+            Console.WriteLine("║            Disco Lights              ║");
+
+            Console.WriteLine("╠══════════════════════════════════════╣");
+            string formattedText = GetConfiguredSymbol(twitchConfigured) == "Complete" ? $"║ 1. Connect to Twitch ({GetConfiguredSymbol(twitchConfigured)})      ║" : $"║ 1. Connect to Twitch ({GetConfiguredSymbol(twitchConfigured)})    ║";
+            Console.WriteLine(formattedText);
+            Console.WriteLine("║ 2. Start Bot                         ║");
+
+            Console.WriteLine("╚══════════════════════════════════════╝");
+
+            Console.ResetColor();
         }
 
         public async static Task ValidateHueConfiguration()
         {
-            JsonNode? bridgeIp = await jsonController.GetValueByKeyAsync("bridgeIp");
-            JsonNode? bridgeId = await jsonController.GetValueByKeyAsync("bridgeId");
+            BridgeValidator validator = new();
 
-            string bridgeIpValue = bridgeIp.GetValue<string>();
-            string bridgeIdValue = bridgeId.GetValue<string>();
+            string localBridgeIp = await jsonController.GetValueByKeyAsync<string>("bridgeIp");
+            string localBridgeId = await jsonController.GetValueByKeyAsync<string>("bridgeId");
+            string localAppKey = await jsonController.GetValueByKeyAsync<string>("AppKey");
 
-            if (string.IsNullOrEmpty(bridgeIpValue) || string.IsNullOrEmpty(bridgeIdValue))
+            // Check if Bridge IP or ID is missing
+            if (string.IsNullOrEmpty(localBridgeIp) || string.IsNullOrEmpty(localBridgeId))
             {
                 await hueController.DiscoverBridgeAsync();
+                // Re-fetch the bridge IP and ID after discovery
+                localBridgeIp = await jsonController.GetValueByKeyAsync<string>("bridgeIp");
+                localBridgeId = await jsonController.GetValueByKeyAsync<string>("bridgeId");
             }
+
+            // Only configure the certificate if the file does not exist
+            if (!File.Exists("huebridge_cacert.pem"))
+            {
+                // Ensure that localBridgeIp is not null or empty before configuring the certificate
+                if (!string.IsNullOrEmpty(localBridgeIp))
+                {
+                    await CertificateService.ConfigureCertificate([localBridgeIp, "443", "huebridge_cacert.pem"]);
+                }
+                else
+                {
+                    Console.WriteLine("Bridge IP is missing, cannot configure the certificate.");
+                }
+            }
+
+
+            /*
+
+            This feature is temporarly disabled
+
+            if (!string.IsNullOrEmpty(localBridgeIp) && !string.IsNullOrEmpty(localBridgeId) && !string.IsNullOrEmpty(localAppKey))
+            {
+                bool validBridgeIp = await validator.ValidateBridgeIpAsync(localBridgeId, localBridgeIp, localAppKey);
+                if (!validBridgeIp)
+                {
+                    Console.WriteLine("ASDASd");
+                    await hueController.DiscoverBridgeAsync();
+                }
+            }*/
         }
 
         private static async Task<bool> ValidateTwitchConfiguration(TwitchLib.Api.TwitchAPI api)
         {
-            JsonNode? jsonData = await jsonController.GetValueByKeyAsync("AccessToken");
-            string accessToken = jsonData.GetValue<string>();
-            Console.WriteLine(await api.Auth.ValidateAccessTokenAsync("accessToken"));
+            string accessToken = await jsonController.GetValueByKeyAsync<string>("AccessToken");
+
             if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync(accessToken) != null)
             {
                 return true;
             }
             else
             {
-                JsonNode? refreshTokenJson = await jsonController.GetValueByKeyAsync("RefreshToken");
-                string refreshToken = refreshTokenJson.GetValue<string>();
+                string refreshToken = await jsonController.GetValueByKeyAsync<string>("RefreshToken");
 
                 if (!string.IsNullOrEmpty(refreshToken))
                 {
@@ -121,22 +163,28 @@ namespace TwitchChatHueControls
         {
             bool twitchConfigured = await ValidateTwitchConfiguration(Api);
 
-            JsonNode? bridgeIp = await jsonController.GetValueByKeyAsync("bridgeIp");
-            string bridgeIpValue = bridgeIp.GetValue<string>();
-            JsonNode? appKey = await jsonController.GetValueByKeyAsync("AppKey");
-            string appKeyValue = appKey.GetValue<string>();
-
-            bool result = await hueController.StartPollingForLinkButtonAsync("YukiDanceParty", "MyDevice", bridgeIpValue, appKeyValue);
-            if (result == true)
+            if (twitchConfigured == false)
             {
-                JsonNode AccessTokenJson = await jsonController.GetValueByKeyAsync("AccessToken");
-                string AccessToken = AccessTokenJson.GetValue<string>();
-                TwitchEventSubListener eventSubListener = new TwitchEventSubListener(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
-                const string wsstring = "wss://eventsub.wss.twitch.tv/ws";
-                const string localwsstring = "ws://127.0.0.1:8080/ws";
-                await eventSubListener.ConnectAsync(new Uri(localwsstring));
+                Console.WriteLine("\nError: Twitch Configuration is incomplete. \n");
+                return;
+            }
+            else
+            {
+                string bridgeIp = await jsonController.GetValueByKeyAsync<string>("bridgeIp");
+                string appKey = await jsonController.GetValueByKeyAsync<string>("AppKey");
 
-                await eventSubListener.ListenForEventsAsync();
+                bool result = await hueController.StartPollingForLinkButtonAsync("YukiDanceParty", "MyDevice", bridgeIp, appKey);
+                if (result == true)
+                {
+                    string AccessToken = await jsonController.GetValueByKeyAsync<string>("AccessToken");
+
+                    TwitchEventSubListener eventSubListener = new TwitchEventSubListener(config.ClientId, config.ChannelId, $"oauth:{AccessToken}", hueController);
+                    const string wsstring = "wss://eventsub.wss.twitch.tv/ws";
+                    const string localwsstring = "ws://127.0.0.1:8080/ws";
+                    await eventSubListener.ConnectAsync(new Uri(wsstring));
+
+                    await eventSubListener.ListenForEventsAsync();
+                }
             }
         }
         public static async Task ConfigureTwitchTokens()

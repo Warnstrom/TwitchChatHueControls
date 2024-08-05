@@ -21,7 +21,6 @@ public class HueController : IDisposable
     private string _bridgeIp;
     private string _bridgeId;
     private Timer _pollingTimer;
-    private const int PollingInterval = 10000;
     private bool _isPolling;
 
     public HueController(JsonFileController jsonController)
@@ -29,56 +28,7 @@ public class HueController : IDisposable
         _httpClient = new HttpClient();
         _jsonController = jsonController;
     }
-
     public async Task DiscoverBridgeAsync()
-    {
-        BridgeValidator validator = new();
-        string localBridgeIp = await LoadBridgeIpFromConfigAsync();
-        string localBridgeId = await LoadBridgeIdFromConfigAsync();
-
-        if (string.IsNullOrEmpty(localBridgeIp) || string.IsNullOrEmpty(localBridgeId))
-        {
-            await GetAndSaveBridgeInfoAsync();
-        }
-
-        if (!File.Exists("huebridge_cacert.pem"))
-        {
-            await CertificateService.ConfigureCertificate([_bridgeIp, "443", "huebridge_cacert.pem"]);
-        }
-
-            string localAppKey = await LoadAppKeyFromConfigAsync();
-            bool validBridgeIp = await validator.ValidateBridgeIpAsync(localBridgeId, localBridgeIp, localAppKey);
-
-            if (validBridgeIp)
-            {
-                _bridgeIp = localBridgeIp;
-                Console.WriteLine($"Loaded bridge IP from config file: {localBridgeIp}");
-            }
-            else
-            {
-                await GetAndSaveBridgeInfoAsync();
-            }
-    }
-
-    private async Task<string?> LoadBridgeIpFromConfigAsync()
-    {
-        var bridgeIpJson = await _jsonController.GetValueByKeyAsync("bridgeIp");
-        return bridgeIpJson?.GetValue<string>();
-    }
-
-    private async Task<string?> LoadBridgeIdFromConfigAsync()
-    {
-        var bridgeIdJson = await _jsonController.GetValueByKeyAsync("bridgeId");
-        return bridgeIdJson?.GetValue<string>();
-    }
-
-    private async Task<string?> LoadAppKeyFromConfigAsync()
-    {
-        var Appkey = await _jsonController.GetValueByKeyAsync("AppKey");
-        return Appkey?.GetValue<string>();
-    }
-
-    private async Task GetAndSaveBridgeInfoAsync()
     {
         // Potential useful way to discover bridges????
         //var Bridges = await HueBridgeDiscovery.CompleteDiscoveryAsync(new TimeSpan(5), new TimeSpan(30));
@@ -116,7 +66,7 @@ public class HueController : IDisposable
     {
         if (string.IsNullOrEmpty(_bridgeIp))
         {
-            await GetAndSaveBridgeInfoAsync();
+            await DiscoverBridgeAsync();
         }
 
         string url = $"http://{_bridgeIp}/api";
@@ -152,7 +102,7 @@ public class HueController : IDisposable
     public async Task<bool> StartPollingForLinkButtonAsync(string appName, string deviceName, string bridgeIp, string appKey)
     {
         _pollingTaskCompletionSource = new TaskCompletionSource<bool>();
-        if (string.IsNullOrEmpty(bridgeIp) || string.IsNullOrEmpty(appKey))
+        if (string.IsNullOrEmpty(appKey))
         {
             _pollingTaskCompletionSource = new TaskCompletionSource<bool>();
             _isPolling = true;
@@ -174,7 +124,7 @@ public class HueController : IDisposable
                 {
                     Console.WriteLine("Waiting for the link button to be pressed...\n");
                 }
-            }, null, 0, PollingInterval);
+            }, null, 0, 5000);
         }
         else
         {
@@ -216,7 +166,7 @@ public class HueController : IDisposable
 
         if (_lightMap.TryGetValue(lampName, out var lightGuid))
         {
-            var command = new UpdateLight().TurnOn().SetColor(new RGBColor(color));
+            var command = new UpdateLight().SetColor(new RGBColor(color));
             await _hueClient.UpdateLightAsync(lightGuid, command);
         }
         else
@@ -235,6 +185,10 @@ public class HueController : IDisposable
         };
     }
 
+    private async Task<string?> LoadBridgeIpFromConfigAsync()
+    {
+        return await _jsonController.GetValueByKeyAsync<string>("bridgeIp");
+    }
     public void Dispose()
     {
         _httpClient.Dispose();
