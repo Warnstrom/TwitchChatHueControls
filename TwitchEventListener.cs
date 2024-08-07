@@ -3,6 +3,24 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
+public class SubscribeEventPayload
+{
+    public string type { get; set; }
+    public string version { get; set; }
+    public Condition condition { get; set; }
+    public Transport transport { get; set; }
+}
+public class Condition
+{
+    public string broadcaster_user_id { get; set; }
+    public string user_id { get; set; }
+}
+
+public class Transport
+{
+    public string method { get; set; }
+    public string session_id { get; set; }
+}
 public interface ITwitchEventSubListener
 {
     Task ConnectAsync(Uri websocketUrl);
@@ -42,23 +60,22 @@ public class TwitchEventSubListener : ITwitchEventSubListener
     public async Task SubscribeToChannelPointRewardsAsync(string sessionId)
     {
 
-        var subscribeMessage = new
+        var eventPayload = new SubscribeEventPayload
         {
             type = "channel.channel_points_custom_reward_redemption.add",
             version = "1",
-            condition = new
+            condition = new Condition
             {
                 broadcaster_user_id = _channelId
             },
-            transport = new
+            transport = new Transport
             {
                 method = "websocket",
                 session_id = sessionId,
             }
         };
 
-        string subscribeMessageJson = JsonConvert.SerializeObject(subscribeMessage);
-        await SendMessageAsync(subscribeMessageJson, "channel.chat.message");
+        await SendMessageAsync(eventPayload);
     }
 
     // We subscribe to ChannelChatMessage only for local testing
@@ -66,38 +83,38 @@ public class TwitchEventSubListener : ITwitchEventSubListener
     public async Task SubscribeToChannelChatMessageAsync(string sessionId)
     {
 
-        var subscribeMessage = new
+        var eventPayload = new SubscribeEventPayload
         {
             type = "channel.chat.message",
             version = "1",
-            condition = new
+            condition = new Condition
             {
                 broadcaster_user_id = _channelId,
                 user_id = _channelId
             },
-            transport = new
+            transport = new Transport
             {
                 method = "websocket",
-                session_id = sessionId,
+                session_id = sessionId
             }
         };
 
-        string subscribeMessageJson = JsonConvert.SerializeObject(subscribeMessage);
-        await SendMessageAsync(subscribeMessageJson, "channel.chat.message");
+        await SendMessageAsync(eventPayload);
     }
 
-    private async Task SendMessageAsync(string message, string type = "")
+    private async Task SendMessageAsync(SubscribeEventPayload eventPayload)
     {
+        string payload = JsonConvert.SerializeObject(eventPayload);
         try
         {
-            HttpResponseMessage response = await _twitchHttpClient.PostAsync("AddSubscription", message);
+            HttpResponseMessage response = await _twitchHttpClient.PostAsync("AddSubscription", payload);
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Twitch Event {type} Subscription created successfully.");
+                Console.WriteLine($"Twitch Event {eventPayload.type} Subscription created successfully.");
             }
             else
             {
-                Console.WriteLine($"Failed to create {type} Twitch Event Subscription. Status code: " + response.StatusCode);
+                Console.WriteLine($"Failed to create {eventPayload.type} Twitch Event Subscription. Status code: " + response.StatusCode);
             }
         }
         catch (HttpRequestException e)
