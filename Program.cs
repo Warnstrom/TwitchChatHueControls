@@ -10,7 +10,6 @@ namespace TwitchChatHueControls
         {
             try
             {
-                          throw new InvalidOperationException("Something went wrong!");
                 // Create a new ServiceCollection
                 var serviceCollection = new ServiceCollection();
 
@@ -28,20 +27,20 @@ namespace TwitchChatHueControls
             {
                 Console.WriteLine("An error occurred: " + ex.Message);
                 Console.WriteLine("Stack Trace: " + ex.StackTrace);
-                            Console.WriteLine("                    ____________________________");
-            Console.WriteLine("                   / Oops, something went wrong. \\");
-            Console.WriteLine("                   \\     Please try again :3     /");
-            Console.WriteLine("                   .´‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾");
-            Console.WriteLine("　　　　　   __   .´ ");
-            Console.WriteLine("　　　　 ／フ   フ");
-            Console.WriteLine("　　　　|  .   .|");
-            Console.WriteLine("　 　　／`ミ__xノ");
-            Console.WriteLine("　 　 /　　 　 |");
-            Console.WriteLine("　　 /　 ヽ　　ﾉ");
-            Console.WriteLine(" 　 │　　 | | |");
-            Console.WriteLine("／￣|　　 | | |");
-            Console.WriteLine("| (￣ヽ_ヽ)_)__)");
-            Console.WriteLine("＼二つ");
+                Console.WriteLine("                    ____________________________");
+                Console.WriteLine("                   / Oops, something went wrong. \\");
+                Console.WriteLine("                   \\     Please try again :3     /");
+                Console.WriteLine("                   .´‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾");
+                Console.WriteLine("　　　　　   __   .´ ");
+                Console.WriteLine("　　　　 ／フ   フ");
+                Console.WriteLine("　　　　|  .   .|");
+                Console.WriteLine("　 　　／`ミ__xノ");
+                Console.WriteLine("　 　 /　　 　 |");
+                Console.WriteLine("　　 /　 ヽ　　ﾉ");
+                Console.WriteLine(" 　 │　　 | | |");
+                Console.WriteLine("／￣|　　 | | |");
+                Console.WriteLine("| (￣ヽ_ヽ)_)__)");
+                Console.WriteLine("＼二つ");
             }
             finally
             {
