@@ -55,6 +55,7 @@ public class TwitchEventSubListener : ITwitchEventSubListener
         _webSocket.Options.SetRequestHeader("Authorization", "Bearer " + _oauthToken);
         _webSocket.Options.SetRequestHeader("Content-Type", "application/json");
         await _webSocket.ConnectAsync(websocketUrl, CancellationToken.None);
+        Console.WriteLine("Successfully connected to Twitch Redemption Service");
     }
 
     public async Task SubscribeToChannelPointRewardsAsync(string sessionId)
@@ -110,11 +111,11 @@ public class TwitchEventSubListener : ITwitchEventSubListener
             HttpResponseMessage response = await _twitchHttpClient.PostAsync("AddSubscription", payload);
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Twitch Event {eventPayload.type} Subscription created successfully.");
+                Console.WriteLine($"Successfully subscribed to Twitch Redemption Service Event: {eventPayload.type}.");
             }
             else
             {
-                Console.WriteLine($"Failed to create {eventPayload.type} Twitch Event Subscription. Status code: " + response.StatusCode);
+                Console.WriteLine($"Failed to subscribe to Twitch Redemption Service Event: {eventPayload.type}. Status code: " + response.StatusCode);
             }
         }
         catch (HttpRequestException e)
@@ -159,7 +160,7 @@ public class TwitchEventSubListener : ITwitchEventSubListener
         }
         catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
         {
-            Console.WriteLine("WebSocket connection closed prematurely.");
+            Console.WriteLine("Twitch Redemption Service connection closed prematurely.");
         }
         catch (Exception ex)
         {
@@ -287,36 +288,38 @@ public class TwitchEventSubListener : ITwitchEventSubListener
             }
         }
     }
-private async Task HandleReconnectAsync(JObject payload)
-{
-    try
+  private async Task HandleReconnectAsync(JObject payload)
     {
-        if (_webSocket.State == WebSocketState.Open)
+        try
         {
-            await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
-            Console.WriteLine("Twitch EventSub Websocket Disconnecting...");
+            if (_webSocket != null && _webSocket.State == WebSocketState.Open)
+            {
+                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
+                Console.WriteLine("Disconnecting from Twitch Redemption Service");
+                DisposeWebSocket();
+            }
+
+            string reconnectUrl = (string)payload["payload"]["session"]["reconnect_url"];
+            if (Uri.TryCreate(reconnectUrl, UriKind.Absolute, out Uri? uri))
+            {
+                Console.WriteLine("Reconnecting to Twitch Redemption Service");
+                await ConnectAsync(uri);
+            }
         }
-
-        string reconnectUrl = payload["payload"]["session"]["reconnect_url"].ToString();
-        Uri uri = new Uri(reconnectUrl);
-
-        _webSocket = new ClientWebSocket();
-        Console.WriteLine("Twitch EventSub Websocket Reconnecting...");
-        await _webSocket.ConnectAsync(uri, CancellationToken.None);
-
-        await ListenForEventsAsync();
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error during reconnect: " + ex.Message);
+        }
     }
-    catch (Exception ex)
-    {
-        // Handle any exceptions that occur during the reconnection process
-        Console.WriteLine($"Error during reconnection: {ex.Message}");
-    }
-}
-
 
     private Task HandleKeepAliveAsync(JObject payload)
     {
         return Task.CompletedTask;
     }
 
+    private void DisposeWebSocket()
+    {
+        _webSocket?.Dispose();
+        _webSocket = null;
+    }
 }

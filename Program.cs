@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json.Nodes;
-using DotNetEnv;
 using Microsoft.Extensions.Configuration;
 
 namespace TwitchChatHueControls
@@ -9,24 +8,35 @@ namespace TwitchChatHueControls
     {
         private static async Task Main(string[] args)
         {
-            // Create a new ServiceCollection
-            var serviceCollection = new ServiceCollection();
+            try
+            {
+                // Create a new ServiceCollection
+                var serviceCollection = new ServiceCollection();
 
-            // Configure services
-            ConfigureServices(serviceCollection);
+                // Configure services
+                ConfigureServices(serviceCollection);
 
-            // Build the ServiceProvider
-            var serviceProvider = serviceCollection.BuildServiceProvider();
+                // Build the ServiceProvider
+                var serviceProvider = serviceCollection.BuildServiceProvider();
 
-            // Run the application
-            await serviceProvider.GetRequiredService<App>().RunAsync();
+                // Run the application
+                await serviceProvider.GetRequiredService<App>().RunAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("An error occurred: " + ex.Message);
+                Console.WriteLine("Stack Trace: " + ex.StackTrace);
+            }
+            finally
+            {
+                Console.WriteLine("Press Enter to exit.");
+                Console.ReadLine();
+            }
         }
 
         private static void ConfigureServices(IServiceCollection services)
         {
-            // Load environment variables from .env file
-            Env.Load();
-
             // Create and configure the ConfigurationBuilder
             var configurationBuilder = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
@@ -110,7 +120,7 @@ namespace TwitchChatHueControls
             BridgeValidator validator = new();
 
             string localBridgeIp = _configuration["bridgeIp"];
-            string localBridgeId = _configuration["bridgeId"];;
+            string localBridgeId = _configuration["bridgeId"];
             string localAppKey = _configuration["AppKey"];
 
             if (string.IsNullOrEmpty(localBridgeIp) || string.IsNullOrEmpty(localBridgeId))
@@ -148,7 +158,7 @@ namespace TwitchChatHueControls
                 if (!string.IsNullOrEmpty(refreshToken))
                 {
                     Console.WriteLine("AccessToken is invalid, refreshing for a new token");
-                    var refresh = await api.Auth.RefreshAuthTokenAsync(refreshToken, _configuration["ChannelId"],  _configuration["ClientId"]);
+                    var refresh = await api.Auth.RefreshAuthTokenAsync(refreshToken, _configuration["ChannelId"], _configuration["ClientId"]);
                     api.Settings.AccessToken = refresh.AccessToken;
 
                     await _jsonController.UpdateAsync(jsonNode =>
