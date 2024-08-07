@@ -1,7 +1,7 @@
 
 public static class HexColorMapDictionary
 {
-        private static readonly JsonFileController jsonController = new("colors.json");
+    private static readonly JsonFileController jsonController = new("colors.json");
 
     static Dictionary<string, string> HexColorMap = new Dictionary<string, string>();
 

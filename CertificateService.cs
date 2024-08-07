@@ -28,7 +28,7 @@ class CertificateService
         }
     }
 
-    private static async Task<string> FetchCertificateAsync(string serverAddress, string port)
+    private static async Task<string?> FetchCertificateAsync(string serverAddress, string port)
     {
         Process process = new Process();
         process.StartInfo.FileName = "openssl";
@@ -45,7 +45,7 @@ class CertificateService
         return ExtractCertificate(output);
     }
 
-    private static string ExtractCertificate(string output)
+    private static string? ExtractCertificate(string output)
     {
         const string beginCert = "-----BEGIN CERTIFICATE-----";
         const string endCert = "-----END CERTIFICATE-----";
@@ -56,7 +56,7 @@ class CertificateService
         if (startIndex != -1 && endIndex != -1)
         {
             endIndex += endCert.Length;
-            return output.Substring(startIndex, endIndex - startIndex);
+            return output[startIndex..endIndex];
         }
 
         return null;

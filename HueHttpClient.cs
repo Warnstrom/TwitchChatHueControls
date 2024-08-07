@@ -8,12 +8,21 @@ using HueApi.Models.Requests;
 using HueApi.ColorConverters;
 using HueApi.ColorConverters.Original.Extensions;
 
-public class HueController : IDisposable
+public interface IHueController : IDisposable
+{
+    Task DiscoverBridgeAsync();
+    Task<bool> TryRegisterApplicationAsync(string appName, string deviceName);
+    Task<bool> StartPollingForLinkButtonAsync(string appName, string deviceName, string bridgeIp, string appKey);
+    void GetLightsAsync();
+    Task SetLightColorAsync(string lamp, string color);
+}
+
+public class HueController : IHueController, IDisposable
 {
     private readonly HttpBridgeLocator locator = new();
     private readonly Dictionary<string, Guid> _lightMap = new();
     private readonly HttpClient _httpClient;
-    private readonly JsonFileController _jsonController;
+    private readonly IJsonFileController _jsonController;
     private TaskCompletionSource<bool> _pollingTaskCompletionSource;
     private LocalHueApi _hueClient;
     private HueResponse<Light> _lights;
@@ -23,7 +32,7 @@ public class HueController : IDisposable
     private Timer _pollingTimer;
     private bool _isPolling;
 
-    public HueController(JsonFileController jsonController)
+    public HueController(IJsonFileController jsonController)
     {
         _httpClient = new HttpClient();
         _jsonController = jsonController;
@@ -184,11 +193,7 @@ public class HueController : IDisposable
             _ => null,
         };
     }
-
-    private async Task<string?> LoadBridgeIpFromConfigAsync()
-    {
-        return await _jsonController.GetValueByKeyAsync<string>("bridgeIp");
-    }
+    
     public void Dispose()
     {
         _httpClient.Dispose();

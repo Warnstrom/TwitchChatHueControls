@@ -2,7 +2,7 @@
 /C# programming.sln
 /bin
 /obj
-/tokens.json
+/appsettings.json
 /.env
 huebridge_cacert.pem
 TwitchChatHueControls.csproj

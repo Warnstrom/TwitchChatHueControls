@@ -3,8 +3,15 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
-using TwitchLib.PubSub.Extensions;
-public class TwitchEventSubListener
+public interface ITwitchEventSubListener
+{
+    Task ConnectAsync(Uri websocketUrl);
+    Task SubscribeToChannelPointRewardsAsync(string sessionId);
+    Task SubscribeToChannelChatMessageAsync(string sessionId);
+    Task ListenForEventsAsync();
+}
+
+public class TwitchEventSubListener : ITwitchEventSubListener
 {
     private readonly Regex ValidHexCodePattern = new Regex("([0-9a-fA-F]{6})$");
     private readonly string _clientId;
@@ -12,9 +19,9 @@ public class TwitchEventSubListener
     private readonly string _oauthToken;
     private ClientWebSocket _webSocket;
     private readonly TwitchHttpClient _twitchHttpClient;
-    private HueController _hueController;
+    private IHueController _hueController;
 
-    public TwitchEventSubListener(string clientId, string channelId, string oauthToken, HueController hueController)
+    public TwitchEventSubListener(string clientId, string channelId, string oauthToken, IHueController hueController)
     {
         _hueController = hueController;
         _clientId = clientId;
@@ -180,8 +187,8 @@ public class TwitchEventSubListener
     private async Task HandleSessionWelcomeAsync(JObject payload)
     {
         string sessionId = (string)payload["payload"]["session"]["id"];
-        //await SubscribeToChannelPointRewardsAsync(sessionId);
-        await SubscribeToChannelChatMessageAsync(sessionId);
+        await SubscribeToChannelPointRewardsAsync(sessionId);
+        //await SubscribeToChannelChatMessageAsync(sessionId);
     }
 
     private async Task HandleNotificationAsync(JObject payload)

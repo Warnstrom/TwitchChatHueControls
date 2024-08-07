@@ -1,10 +1,11 @@
-using System;
-using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
-
-public class JsonFileController
+public interface IJsonFileController
+{
+    Task<T> GetValueByKeyAsync<T>(string key);
+    Task UpdateAsync(Action<JsonNode> updateAction);
+}
+public class JsonFileController : IJsonFileController
 {
     private readonly string _filePath;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -30,7 +31,10 @@ public class JsonFileController
                 bridgeId = "",
                 AccessToken = "",
                 RefreshToken = "",
-                AppKey = ""
+                AppKey = "",
+                ClientSecret = "",
+                ClientId = "",
+                RedirectUri = "http://localhost:8004/callback/"
             };
 
             string jsonString = JsonSerializer.Serialize(defaultJson, _jsonOptions);
