@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
+using Spectre.Console;
 
 namespace TwitchChatHueControls
 {
@@ -21,12 +22,10 @@ namespace TwitchChatHueControls
 
                 // Run the application
                 await serviceProvider.GetRequiredService<App>().RunAsync();
-
             }
             catch (Exception ex)
             {
-                Console.WriteLine("An error occurred: " + ex.Message);
-                Console.WriteLine("Stack Trace: " + ex.StackTrace);
+                // Error handling with Spectre.Console for better visual output
                 Console.WriteLine("                    ____________________________");
                 Console.WriteLine("                   / Oops, something went wrong. \\");
                 Console.WriteLine("                   \\     Please try again :3     /");
@@ -41,10 +40,11 @@ namespace TwitchChatHueControls
                 Console.WriteLine("／￣|　　 | | |");
                 Console.WriteLine("| (￣ヽ_ヽ)_)__)");
                 Console.WriteLine("＼二つ");
+                AnsiConsole.WriteException(ex, ExceptionFormats.ShortenEverything);
             }
             finally
             {
-                Console.WriteLine("Press Enter to exit.");
+                AnsiConsole.Markup("[bold yellow]Press [green]Enter[/] to exit.[/]");
                 Console.ReadLine();
             }
         }
@@ -94,40 +94,54 @@ namespace TwitchChatHueControls
         {
             while (true)
             {
-                await RenderStartMenu();
-                var choice = Console.ReadLine();
+                
+                var choice = await RenderStartMenu();
 
                 switch (choice)
                 {
-                    case "1":
+                    case 1:
                         await ConfigureTwitchTokens();
                         break;
-                    case "2":
+                    case 2:
                         await StartApp();
                         break;
                     default:
-                        Console.WriteLine("Invalid choice. Please select again.");
+                        AnsiConsole.Markup("[red]Invalid choice. Please select again.[/]\n");
                         break;
                 }
             }
         }
 
-        private async Task RenderStartMenu()
-        {
-            bool twitchConfigured = await ValidateTwitchConfiguration(_api);
-            await ValidateHueConfiguration();
+ private async Task<int> RenderStartMenu()
+{
+    bool twitchConfigured = await ValidateTwitchConfiguration(_api);
+    await ValidateHueConfiguration();
 
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine("╔══════════════════════════════════════╗");
-            Console.WriteLine("║           Welcome To Yuki's          ║");
-            Console.WriteLine("║            Disco Lights              ║");
-            Console.WriteLine("╠══════════════════════════════════════╣");
-            string formattedText = GetConfiguredSymbol(twitchConfigured) == "Complete" ? $"║ 1. Connect to Twitch ({GetConfiguredSymbol(twitchConfigured)})      ║" : $"║ 1. Connect to Twitch ({GetConfiguredSymbol(twitchConfigured)})    ║";
-            Console.WriteLine(formattedText);
-            Console.WriteLine("║ 2. Start Bot                         ║");
-            Console.WriteLine("╚══════════════════════════════════════╝");
-            Console.ResetColor();
-        }
+    // Create a table to structure the menu
+    var table = new Table()
+        .Border(TableBorder.Rounded)
+        .BorderColor(Color.Teal)
+        .AddColumn(new TableColumn("[bold teal]Welcome To Yuki's Disco Lights[/]"));
+
+    string twitchStatus = twitchConfigured ? "Complete" : "Incomplete";
+    table.AddRow($"[bold yellow]1.[/] Connect to Twitch ([{(twitchConfigured ? "green" : "red")}]{twitchStatus}[/])");
+    table.AddRow("[bold yellow]2.[/] Start Bot");
+
+    AnsiConsole.Write(table);
+
+    var prompt = new SelectionPrompt<int>()
+    .Title("Please choose an option")
+        .AddChoices(1, 2)
+        .HighlightStyle(new Style(foreground: Color.Teal));
+
+    // Render the prompt and get the user's selection
+    int selectedOption = AnsiConsole.Prompt(prompt);
+
+    // Return the selected option
+    return selectedOption;
+}
+
+
 
         private async Task ValidateHueConfiguration()
         {
@@ -152,14 +166,14 @@ namespace TwitchChatHueControls
                 }
                 else
                 {
-                    Console.WriteLine("Bridge IP is missing, cannot configure the certificate.");
+                    AnsiConsole.Markup("[red]Bridge IP is missing, cannot configure the certificate.[/]\n");
                 }
             }
         }
 
         private async Task<bool> ValidateTwitchConfiguration(TwitchLib.Api.TwitchAPI api)
         {
-            string accessToken = await _jsonController.GetValueByKeyAsync<string>("AccessToken");
+            string accessToken = _configuration["AccessToken"];
 
             if (!string.IsNullOrEmpty(accessToken) && await api.Auth.ValidateAccessTokenAsync(accessToken) != null)
             {
@@ -167,11 +181,11 @@ namespace TwitchChatHueControls
             }
             else
             {
-                string refreshToken = await _jsonController.GetValueByKeyAsync<string>("RefreshToken");
+                string refreshToken = _configuration["RefreshToken"];
 
                 if (!string.IsNullOrEmpty(refreshToken))
                 {
-                    Console.WriteLine("AccessToken is invalid, refreshing for a new token");
+                    AnsiConsole.Markup("[yellow]AccessToken is invalid, refreshing for a new token...[/]\n");
                     var refresh = await api.Auth.RefreshAuthTokenAsync(refreshToken, _configuration["ChannelId"], _configuration["ClientId"]);
                     api.Settings.AccessToken = refresh.AccessToken;
 
@@ -189,18 +203,13 @@ namespace TwitchChatHueControls
             return false;
         }
 
-        private string GetConfiguredSymbol(bool isConfigured)
-        {
-            return isConfigured ? "Complete" : "Incomplete";
-        }
-
         private async Task StartApp()
         {
             bool twitchConfigured = await ValidateTwitchConfiguration(_api);
 
             if (!twitchConfigured)
             {
-                Console.WriteLine("\nError: Twitch Configuration is incomplete. \n");
+                AnsiConsole.Markup("[bold red]\nError: Twitch Configuration is incomplete.\n[/]");
                 return;
             }
             else
@@ -228,7 +237,7 @@ namespace TwitchChatHueControls
 
             WebServer server = new(_configuration["RedirectUri"]);
 
-            Console.WriteLine($"Please authorize here:\n{getAuthorizationCodeUrl(_configuration["ClientId"], _configuration["RedirectUri"], scopes)}");
+            AnsiConsole.Markup($"Please authorize here:\n[link={getAuthorizationCodeUrl(_configuration["ClientId"], _configuration["RedirectUri"], scopes)}]Authorization Link[/]\n");
 
             var auth = await server.Listen();
 
@@ -247,7 +256,10 @@ namespace TwitchChatHueControls
 
             var user = (await _api.Helix.Users.GetUsersAsync()).Users[0];
 
-            Console.WriteLine($"Authorization success!\n\nUser: {user.DisplayName} (id: {user.Id})\nAccess token: {resp.AccessToken}\nRefresh token: {resp.RefreshToken}\nExpires in: {resp.ExpiresIn}\nScopes: {string.Join(", ", resp.Scopes)}\n");
+            AnsiConsole.Write(
+                new Panel($"[bold green]Authorization success![/]\n\n[bold aqua]User:[/] {user.DisplayName} (id: {user.Id})\n[bold aqua]Access token:[/] {resp.AccessToken}\n[bold aqua]Refresh token:[/] {resp.RefreshToken}\n[bold aqua]Scopes:[/] {string.Join(", ", resp.Scopes)}")
+                .BorderColor(Color.Green)
+            );
         }
 
         private string getAuthorizationCodeUrl(string clientId, string redirectUri, List<string> scopes)
