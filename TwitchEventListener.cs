@@ -3,6 +3,8 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
+using Spectre.Console;
+
 public class SubscribeEventPayload
 {
     public string type { get; set; }
@@ -55,7 +57,7 @@ public class TwitchEventSubListener : ITwitchEventSubListener
         _webSocket.Options.SetRequestHeader("Authorization", "Bearer " + _oauthToken);
         _webSocket.Options.SetRequestHeader("Content-Type", "application/json");
         await _webSocket.ConnectAsync(websocketUrl, CancellationToken.None);
-        Console.WriteLine("Successfully connected to Twitch Redemption Service");
+        AnsiConsole.MarkupLine("[bold green]Successfully connected to Twitch Redemption Service[/]");
     }
 
     public async Task SubscribeToChannelPointRewardsAsync(string sessionId)
@@ -111,11 +113,12 @@ public class TwitchEventSubListener : ITwitchEventSubListener
             HttpResponseMessage response = await _twitchHttpClient.PostAsync("AddSubscription", payload);
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Successfully subscribed to Twitch Redemption Service Event: {eventPayload.type}.");
+                AnsiConsole.MarkupLine($"[bold green]Successfully subscribed to Twitch Redemption Service Event:[/] [bold yellow]{eventPayload.type}[/]");
             }
             else
             {
-                Console.WriteLine($"Failed to subscribe to Twitch Redemption Service Event: {eventPayload.type}. Status code: " + response.StatusCode);
+                AnsiConsole.MarkupLine($"[bold red]Failed to subscribe to Twitch Redemption Service Event:[/] [bold yellow]{eventPayload.type}[/]");
+                AnsiConsole.MarkupLine($"[bold teal]Reason:[/] [bold white]{response.StatusCode}[/]");
             }
         }
         catch (HttpRequestException e)
@@ -206,7 +209,7 @@ public class TwitchEventSubListener : ITwitchEventSubListener
     {
         string sessionId = (string)payload["payload"]["session"]["id"];
         await SubscribeToChannelPointRewardsAsync(sessionId);
-        //await SubscribeToChannelChatMessageAsync(sessionId);
+        await SubscribeToChannelChatMessageAsync(sessionId);
     }
 
     private async Task HandleNotificationAsync(JObject payload)
@@ -295,14 +298,14 @@ public class TwitchEventSubListener : ITwitchEventSubListener
             if (_webSocket != null && _webSocket.State == WebSocketState.Open)
             {
                 await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Reconnecting", CancellationToken.None);
-                Console.WriteLine("Disconnecting from Twitch Redemption Service");
+                AnsiConsole.MarkupLine("[bold yellow]Disconnecting from Twitch Redemption Service[/]");
                 DisposeWebSocket();
             }
 
             string reconnectUrl = (string)payload["payload"]["session"]["reconnect_url"];
             if (Uri.TryCreate(reconnectUrl, UriKind.Absolute, out Uri? uri))
             {
-                Console.WriteLine("Reconnecting to Twitch Redemption Service");
+                AnsiConsole.MarkupLine("[bold yellow]Reconnecting to Twitch Redemption Service");
                 await ConnectAsync(uri);
             }
         }

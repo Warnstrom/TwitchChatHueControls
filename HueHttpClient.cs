@@ -7,6 +7,7 @@ using HueApi.Models;
 using HueApi.Models.Requests;
 using HueApi.ColorConverters;
 using HueApi.ColorConverters.Original.Extensions;
+using Spectre.Console;
 
 public interface IHueController : IDisposable
 {
@@ -125,20 +126,20 @@ public class HueController : IHueController, IDisposable
                     _isPolling = false;
                     _pollingTaskCompletionSource.SetResult(true);
                     _hueClient = new LocalHueApi(_bridgeIp, _appKey);
-                    Console.WriteLine($"Successfully registered with the Hue Bridge ({_bridgeIp}).\n");
+                    AnsiConsole.MarkupLine($"[bold green]Successfully registered with the Hue Bridge[/] [bold yellow]({_bridgeIp})[/]\n");
                     GetLightsAsync();
                     _pollingTimer.Dispose();
                 }
                 else
                 {
-                    Console.WriteLine("Waiting for the link button to be pressed...\n");
+                    AnsiConsole.MarkupLine("[bold yellow]Waiting for the link button to be pressed...[/]\n");
                 }
             }, null, 0, 5000);
         }
         else
         {
             _hueClient = new LocalHueApi(bridgeIp, appKey);
-            Console.WriteLine($"Successfully connected with Hue Bridge using predefined ip ({bridgeIp}).\n");
+            AnsiConsole.MarkupLine($"[bold green]Successfully connected with Hue Bridge using predefined ip[/] [bold yellow]({bridgeIp})[/]\n");
             GetLightsAsync();
             _pollingTaskCompletionSource.SetResult(true);
 
@@ -151,12 +152,19 @@ public class HueController : IHueController, IDisposable
         _lights = await _hueClient.GetLightsAsync();
         if (_lights.Data.Count != 0)
         {
-            Console.WriteLine("Found devices:");
+            var table = new Table()
+                .Border(TableBorder.Rounded)
+                .BorderColor(Spectre.Console.Color.Teal);
+
+            table.AddColumn("Type");
+            table.AddColumn(new TableColumn("Name").Centered());
+
             _lights.Data.ForEach(light =>
             {
-                Console.WriteLine($"Name: {light.Metadata.Name} - Type: {light.Type}\n");
+                table.AddRow(light.Type, light.Metadata.Name);
                 _lightMap[light.Metadata.Name] = light.Id;
             });
+            //AnsiConsole.Write(table);
         }
         else
         {
@@ -193,7 +201,7 @@ public class HueController : IHueController, IDisposable
             _ => null,
         };
     }
-    
+
     public void Dispose()
     {
         _httpClient.Dispose();

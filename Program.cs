@@ -94,7 +94,7 @@ namespace TwitchChatHueControls
         {
             while (true)
             {
-                
+
                 var choice = await RenderStartMenu();
 
                 switch (choice)
@@ -112,34 +112,34 @@ namespace TwitchChatHueControls
             }
         }
 
- private async Task<int> RenderStartMenu()
-{
-    bool twitchConfigured = await ValidateTwitchConfiguration(_api);
-    await ValidateHueConfiguration();
+        private async Task<int> RenderStartMenu()
+        {
+            bool twitchConfigured = await ValidateTwitchConfiguration(_api);
+            await ValidateHueConfiguration();
 
-    // Create a table to structure the menu
-    var table = new Table()
-        .Border(TableBorder.Rounded)
-        .BorderColor(Color.Teal)
-        .AddColumn(new TableColumn("[bold teal]Welcome To Yuki's Disco Lights[/]"));
+            // Create a table to structure the menu
+            var table = new Table()
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Teal)
+                .AddColumn(new TableColumn("[bold teal]Welcome To Yuki's Disco Lights[/]"));
 
-    string twitchStatus = twitchConfigured ? "Complete" : "Incomplete";
-    table.AddRow($"[bold yellow]1.[/] Connect to Twitch ([{(twitchConfigured ? "green" : "red")}]{twitchStatus}[/])");
-    table.AddRow("[bold yellow]2.[/] Start Bot");
+            string twitchStatus = twitchConfigured ? "Complete" : "Incomplete";
+            table.AddRow($"[bold yellow]1.[/] Connect to Twitch ([{(twitchConfigured ? "green" : "yellow")}]{twitchStatus}[/])");
+            table.AddRow("[bold yellow]2.[/] Start Bot");
 
-    AnsiConsole.Write(table);
+            AnsiConsole.Write(table);
 
-    var prompt = new SelectionPrompt<int>()
-    .Title("Please choose an option")
-        .AddChoices(1, 2)
-        .HighlightStyle(new Style(foreground: Color.Teal));
+            var prompt = new SelectionPrompt<int>()
+            .Title("Please choose an option")
+                .AddChoices(1, 2)
+                .HighlightStyle(new Style(foreground: Color.Teal));
 
-    // Render the prompt and get the user's selection
-    int selectedOption = AnsiConsole.Prompt(prompt);
+            // Render the prompt and get the user's selection
+            int selectedOption = AnsiConsole.Prompt(prompt);
 
-    // Return the selected option
-    return selectedOption;
-}
+            // Return the selected option
+            return selectedOption;
+        }
 
 
 
@@ -158,7 +158,7 @@ namespace TwitchChatHueControls
                 localBridgeId = await _jsonController.GetValueByKeyAsync<string>("bridgeId");
             }
 
-            if (!File.Exists("huebridge_cacert.pem"))
+            /*if (!File.Exists("huebridge_cacert.pem"))
             {
                 if (!string.IsNullOrEmpty(localBridgeIp))
                 {
@@ -168,7 +168,7 @@ namespace TwitchChatHueControls
                 {
                     AnsiConsole.Markup("[red]Bridge IP is missing, cannot configure the certificate.[/]\n");
                 }
-            }
+            }*/
         }
 
         private async Task<bool> ValidateTwitchConfiguration(TwitchLib.Api.TwitchAPI api)
